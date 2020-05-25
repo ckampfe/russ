@@ -204,7 +204,7 @@ impl<'a> App<'a> {
                     let entry_id = self.entries.items[selected_idx].id;
                     let entry = crate::rss::get_entry(&self.conn, entry_id)?;
 
-                    let empty_string = String::new();
+                    let empty_string = String::from("No content or description tag provided.");
 
                     // try content tag first,
                     // if there is not content tag,
