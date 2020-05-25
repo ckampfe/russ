@@ -1,4 +1,4 @@
-use app::App;
+use app::{App, Mode};
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     execute,
@@ -86,29 +86,82 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         terminal.draw(|mut f| ui::draw(&mut f, &mut app))?;
-        match rx.recv()? {
-            Event::Input(event) => match event.code {
-                KeyCode::Char('q') => {
-                    disable_raw_mode()?;
-                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                    terminal.show_cursor()?;
+        match app.mode {
+            Mode::Normal => {
+                match rx.recv()? {
+                    Event::Input(event) => match event.code {
+                        KeyCode::Char('q') => {
+                            disable_raw_mode()?;
+                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                            terminal.show_cursor()?;
+                            break;
+                        }
+                        KeyCode::Char(c) => app.on_key(c).await?,
+                        KeyCode::Left => app.on_left(),
+                        KeyCode::Up => app.on_up(),
+                        KeyCode::Right => app.on_right().unwrap(),
+                        KeyCode::Down => app.on_down(),
+                        KeyCode::Enter => app.on_enter().unwrap(),
+                        KeyCode::Esc => app.on_esc(),
+                        _ => {}
+                    },
+                    Event::Tick => {
+                        app.on_tick();
+                    }
+                }
+                if app.should_quit {
                     break;
                 }
-                KeyCode::Char(c) => app.on_key(c),
-                KeyCode::Left => app.on_left(),
-                KeyCode::Up => app.on_up(),
-                KeyCode::Right => app.on_right().unwrap(),
-                KeyCode::Down => app.on_down(),
-                KeyCode::Enter => app.on_enter().unwrap(),
-                KeyCode::Esc => app.on_esc(),
-                _ => {}
-            },
-            Event::Tick => {
-                app.on_tick();
             }
-        }
-        if app.should_quit {
-            break;
+            Mode::Editing => {
+                match rx.recv()? {
+                    Event::Input(event) => match event.code {
+                        KeyCode::Enter => {
+                            app.subscribe_to_feed().await?;
+                            app.input = String::new();
+                            app.select_feeds().await;
+
+                            let current_feed = if app.feed_titles.items.is_empty() {
+                                None
+                            } else {
+                                app.feed_titles.state.select(Some(0));
+                                let selected_idx = app.feed_titles.state.selected().unwrap();
+                                let feed_id = app.feed_titles.items[selected_idx].0;
+                                Some(crate::rss::get_feed(&app.conn, feed_id)?)
+                            };
+
+                            let entries = if let Some(feed) = &current_feed {
+                                let entries = crate::rss::get_entries(&app.conn, feed.id)?
+                                    .into_iter()
+                                    .collect::<Vec<_>>();
+
+                                util::StatefulList::with_items(entries)
+                            } else {
+                                util::StatefulList::with_items(vec![])
+                            };
+
+                            app.entries = entries;
+                        }
+                        KeyCode::Char(c) => {
+                            app.input.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            app.input.pop();
+                        }
+                        KeyCode::Esc => {
+                            app.mode = Mode::Normal;
+                            // events.enable_exit_key();
+                        }
+                        _ => {}
+                    },
+                    Event::Tick => {
+                        app.on_tick();
+                    }
+                }
+                if app.should_quit {
+                    break;
+                }
+            }
         }
     }
 

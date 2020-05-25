@@ -9,6 +9,12 @@ pub(crate) enum Selected {
     Entry(crate::rss::Entry),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Mode {
+    Editing,
+    Normal,
+}
+
 #[derive(Debug)]
 pub(crate) struct App<'a> {
     pub title: &'a str,
@@ -19,10 +25,13 @@ pub(crate) struct App<'a> {
     pub progress: f64,
     pub error_flash: Option<Error>,
     pub feed_titles: util::StatefulList<(i64, String)>,
-    pub entries_titles: util::StatefulList<(i64, String)>,
+    pub entries: util::StatefulList<crate::rss::Entry>,
     pub selected: Selected,
     pub scroll: u16,
     pub current_entry_text: Vec<tui::widgets::Text<'a>>,
+    pub current_feed: Option<crate::rss::Feed>,
+    pub input: String,
+    pub mode: Mode,
 }
 
 impl<'a> App<'a> {
@@ -35,12 +44,30 @@ impl<'a> App<'a> {
         crate::rss::initialize_db(&conn)?;
         // crate::rss::subscribe_to_feed(&conn, "https://zeroclarkthirty.com/feed").await?;
         // crate::rss::subscribe_to_feed(&conn, "https://danielmiessler.com/feed/").await?;
-        let feed_titles = util::StatefulList::with_items(crate::rss::get_feed_titles(&conn)?);
-        let entries_titles = util::StatefulList::with_items(vec![]);
+        let mut feed_titles = util::StatefulList::with_items(crate::rss::get_feed_titles(&conn)?);
 
         let selected = Selected::Feeds;
 
-        let mut app = App {
+        let current_feed = if feed_titles.items.is_empty() {
+            None
+        } else {
+            feed_titles.state.select(Some(0));
+            let selected_idx = feed_titles.state.selected().unwrap();
+            let feed_id = feed_titles.items[selected_idx].0;
+            Some(crate::rss::get_feed(&conn, feed_id)?)
+        };
+
+        let entries = if let Some(feed) = &current_feed {
+            let entries = crate::rss::get_entries(&conn, feed.id)?
+                .into_iter()
+                .collect::<Vec<_>>();
+
+            util::StatefulList::with_items(entries)
+        } else {
+            util::StatefulList::with_items(vec![])
+        };
+
+        let app = App {
             title,
             database_path,
             conn,
@@ -49,23 +76,27 @@ impl<'a> App<'a> {
             should_quit: false,
             error_flash: None,
             feed_titles,
-            entries_titles,
+            entries,
             selected,
             scroll: 0,
             current_entry_text: vec![],
+            current_feed,
+            input: String::new(),
+            mode: Mode::Normal,
         };
 
-        app.on_down();
-        let selected_idx = app.feed_titles.state.selected().unwrap();
-        let feed_id = app.feed_titles.items[selected_idx].0;
-
-        let entries_titles = crate::rss::get_entries_titles(&app.conn, feed_id)?
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        app.entries_titles = util::StatefulList::with_items(entries_titles);
-
         Ok(app)
+    }
+
+    pub async fn select_feeds(&mut self) {
+        self.selected = Selected::Feeds;
+    }
+
+    pub async fn subscribe_to_feed(&mut self) -> Result<(), Error> {
+        let _feed_id = crate::rss::subscribe_to_feed(&self.conn, &self.input).await?;
+        let feed_titles = util::StatefulList::with_items(crate::rss::get_feed_titles(&self.conn)?);
+        self.feed_titles = feed_titles;
+        Ok(())
     }
 
     pub fn on_up(&mut self) {
@@ -76,15 +107,20 @@ impl<'a> App<'a> {
                 let selected_idx = self.feed_titles.state.selected().unwrap();
                 let feed_id = self.feed_titles.items[selected_idx].0;
 
-                let entries_titles = crate::rss::get_entries_titles(&self.conn, feed_id)
+                let current_feed = crate::rss::get_feed(&self.conn, feed_id).unwrap();
+                self.current_feed = Some(current_feed);
+
+                let entries = crate::rss::get_entries(&self.conn, feed_id)
                     .unwrap()
                     .into_iter()
                     .collect::<Vec<_>>();
 
-                self.entries_titles = util::StatefulList::with_items(entries_titles);
+                self.entries = util::StatefulList::with_items(entries);
             }
             Selected::Entries => {
-                self.entries_titles.previous();
+                if !self.entries.items.is_empty() {
+                    self.entries.previous()
+                }
             }
             Selected::Entry(_) => {
                 match self.scroll.checked_sub(1) {
@@ -103,15 +139,20 @@ impl<'a> App<'a> {
                 let selected_idx = self.feed_titles.state.selected().unwrap();
                 let feed_id = self.feed_titles.items[selected_idx].0;
 
-                let entries_titles = crate::rss::get_entries_titles(&self.conn, feed_id)
+                let current_feed = crate::rss::get_feed(&self.conn, feed_id).unwrap();
+                self.current_feed = Some(current_feed);
+
+                let entries = crate::rss::get_entries(&self.conn, feed_id)
                     .unwrap()
                     .into_iter()
                     .collect::<Vec<_>>();
 
-                self.entries_titles = util::StatefulList::with_items(entries_titles);
+                self.entries = util::StatefulList::with_items(entries);
             }
             Selected::Entries => {
-                self.entries_titles.next();
+                if !self.entries.items.is_empty() {
+                    self.entries.next()
+                }
             }
             Selected::Entry(_) => {
                 match self.scroll.checked_add(1) {
@@ -126,7 +167,9 @@ impl<'a> App<'a> {
         match self.selected {
             Selected::Feeds => {
                 self.selected = Selected::Entries;
-                self.entries_titles.state.select(Some(0));
+                if !self.entries.items.is_empty() {
+                    self.entries.state.select(Some(0))
+                }
                 Ok(())
             }
             Selected::Entries => self.on_enter(),
@@ -138,7 +181,9 @@ impl<'a> App<'a> {
         match self.selected {
             Selected::Feeds => {
                 self.selected = Selected::Entries;
-                self.entries_titles.state.select(Some(0));
+                if !self.entries.items.is_empty() {
+                    self.entries.state.select(Some(0))
+                }
             }
             Selected::Entries => self.selected = Selected::Feeds,
             Selected::Entry(_) => {
@@ -154,32 +199,41 @@ impl<'a> App<'a> {
     pub fn on_enter(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Entries => {
-                let selected_idx = self.entries_titles.state.selected().unwrap();
-                let entry_id = self.entries_titles.items[selected_idx].0;
-                let entry = crate::rss::get_entry(&self.conn, entry_id)?;
+                if !self.entries.items.is_empty() {
+                    let selected_idx = self.entries.state.selected().unwrap();
+                    let entry_id = self.entries.items[selected_idx].id;
+                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
 
-                let text = html2text::from_read(
-                    entry
+                    let empty_string = String::new();
+
+                    // try content tag first,
+                    // if there is not content tag,
+                    // go to description tag,
+                    // if no description tag,
+                    // use empty string.
+                    // TODO figure out what to actually do if there are neither
+                    let entry_text = &entry
                         .content
-                        .clone()
-                        .unwrap_or_else(|| String::new())
-                        .as_bytes(),
-                    120,
-                );
+                        .as_ref()
+                        .or_else(|| entry.description.as_ref())
+                        .or_else(|| Some(&empty_string));
 
-                let text = text
-                    .split('\n')
-                    .map(|line| {
-                        tui::widgets::Text::raw({
-                            let mut owned = line.to_owned();
-                            owned.push_str("\n");
-                            owned
+                    let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 120);
+
+                    let text = text
+                        .split('\n')
+                        .map(|line| {
+                            tui::widgets::Text::raw({
+                                let mut owned = line.to_owned();
+                                owned.push_str("\n");
+                                owned
+                            })
                         })
-                    })
-                    .collect::<Vec<_>>();
+                        .collect::<Vec<_>>();
 
-                self.selected = Selected::Entry(entry);
-                self.current_entry_text = text;
+                    self.selected = Selected::Entry(entry);
+                    self.current_entry_text = text;
+                }
 
                 Ok(())
             }
@@ -195,17 +249,42 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_key(&mut self, c: char) {
+    pub async fn on_refresh(&mut self) -> Result<(), Error> {
+        let selected_idx = self.feed_titles.state.selected().unwrap();
+        let feed_id = self.feed_titles.items[selected_idx].0;
+
+        let _ = crate::rss::refresh_feed(&self.conn, feed_id).await?;
+        // and refresh the in-memory feed
+        let current_feed = crate::rss::get_feed(&self.conn, feed_id)?;
+        self.current_feed = Some(current_feed);
+
+        let entries = crate::rss::get_entries(&self.conn, feed_id)
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        self.entries = util::StatefulList::with_items(entries);
+        Ok(())
+    }
+
+    pub async fn on_key(&mut self, c: char) -> Result<(), Error> {
         match c {
             'q' => {
                 self.should_quit = true;
+                Ok(())
             }
-            // vim style
-            'h' => self.on_left(),
-            'j' => self.on_down(),
-            'k' => self.on_up(),
-            'l' => self.on_right().unwrap(),
-            _ => {}
+            // vim-style movement
+            'h' => Ok(self.on_left()),
+            'j' => Ok(self.on_down()),
+            'k' => Ok(self.on_up()),
+            'l' => Ok(self.on_right().unwrap()),
+            // controls
+            'r' => self.on_refresh().await,
+            'e' | 'i' => {
+                self.mode = Mode::Editing;
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 

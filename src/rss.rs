@@ -8,15 +8,44 @@ use std::str::FromStr;
 type EntryId = i64;
 type FeedId = i64;
 
-pub(crate) async fn subscribe_to_feed(conn: &rusqlite::Connection, url: &str) -> Result<(), Error> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Feed {
+    pub id: FeedId,
+    pub title: Option<String>,
+    pub feed_link: Option<String>,
+    pub link: Option<String>,
+    pub refreshed_at: Option<chrono::DateTime<Utc>>,
+    pub inserted_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Entry {
+    pub id: EntryId,
+    pub feed_id: FeedId,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub pub_date: Option<String>,
+    pub description: Option<String>,
+    pub content: Option<String>,
+    pub link: Option<String>,
+    pub read_on: Option<chrono::DateTime<Utc>>,
+    pub inserted_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+pub(crate) async fn subscribe_to_feed(
+    conn: &rusqlite::Connection,
+    url: &str,
+) -> Result<FeedId, Error> {
     let feed: Channel = fetch_feed(url).await?;
-    let feed_id = create_feed(conn, &feed)?;
+    let feed_id = create_feed(conn, &feed, url)?;
     // N+1!!!! YEAH BABY
     for item in feed.items() {
         add_item_to_feed(conn, feed_id, item)?;
     }
 
-    Ok(())
+    Ok(feed_id)
 }
 
 async fn fetch_feed(url: &str) -> Result<Channel, Error> {
@@ -29,7 +58,10 @@ async fn fetch_feed(url: &str) -> Result<Channel, Error> {
 /// fetches the feed and stores the new entries
 /// uses the link as the uniqueness key.
 /// TODO hash the content to see if anything changed, and update that way.
-async fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<EntryId>, Error> {
+pub async fn refresh_feed(
+    conn: &rusqlite::Connection,
+    feed_id: FeedId,
+) -> Result<Vec<EntryId>, Error> {
     let feed_url = get_feed_url(conn, feed_id)?;
     let remote_feed: Channel = fetch_feed(&feed_url).await?;
     let remote_items = remote_feed.items();
@@ -61,22 +93,9 @@ async fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Ve
         inserted_item_ids.push(item_id);
     }
 
-    Ok(inserted_item_ids)
-}
+    update_feed_refreshed_at(&conn, feed_id)?;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Entry {
-    pub id: EntryId,
-    pub feed_id: FeedId,
-    pub title: Option<String>,
-    pub author: Option<String>,
-    pub pub_date: Option<String>,
-    pub description: Option<String>,
-    pub content: Option<String>,
-    pub link: Option<String>,
-    pub read_on: Option<chrono::DateTime<Utc>>,
-    pub inserted_at: chrono::DateTime<Utc>,
-    pub updated_at: chrono::DateTime<Utc>,
+    Ok(inserted_item_ids)
 }
 
 // db functions
@@ -85,7 +104,9 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
         "CREATE TABLE IF NOT EXISTS feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
+        feed_link TEXT,
         link TEXT,
+        refreshed_at TIMESTAMP,
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
@@ -112,11 +133,15 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_feed(conn: &rusqlite::Connection, feed: &Channel) -> Result<FeedId, Error> {
+fn create_feed(
+    conn: &rusqlite::Connection,
+    feed: &Channel,
+    feed_link: &str,
+) -> Result<FeedId, Error> {
     conn.execute(
-        "INSERT INTO feeds (title, link)
-        VALUES (?1, ?2)",
-        params![feed.title(), feed.link()],
+        "INSERT INTO feeds (title, link, feed_link)
+        VALUES (?1, ?2, ?3)",
+        params![feed.title(), feed.link(), feed_link],
     )?;
 
     Ok(conn.last_insert_rowid())
@@ -154,9 +179,38 @@ fn add_item_to_feed(
     Ok(conn.last_insert_rowid())
 }
 
+pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed, Error> {
+    let s = conn.query_row(
+        "SELECT id, title, feed_link, link, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
+        params![feed_id],
+        |row| {
+            Ok(Feed {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                feed_link: row.get(2)?,
+                link: row.get(3)?,
+                refreshed_at: row.get(4)?,
+                inserted_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        },
+    )?;
+
+    Ok(s)
+}
+
+fn update_feed_refreshed_at(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), Error> {
+    conn.execute(
+        "UPDATE feeds SET refreshed_at = ?2 WHERE id = ?1",
+        params![feed_id, Utc::now()],
+    )?;
+
+    Ok(())
+}
+
 fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String, Error> {
     let s: String = conn.query_row(
-        "SELECT link FROM feeds WHERE id=?1",
+        "SELECT feed_link FROM feeds WHERE id=?1",
         params![feed_id],
         |row| row.get(0),
     )?;
@@ -165,7 +219,7 @@ fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String, 
 }
 
 pub(crate) fn get_feed_titles(conn: &rusqlite::Connection) -> Result<Vec<(FeedId, String)>, Error> {
-    let mut statement = conn.prepare("SELECT id, title FROM feeds ORDER BY title DESC")?;
+    let mut statement = conn.prepare("SELECT id, title FROM feeds ORDER BY title ASC")?;
     let result = statement
         .query_map(NO_PARAMS, |row| Ok((row.get(0)?, row.get(1)?)))?
         .map(|s| s.unwrap())
@@ -176,9 +230,21 @@ pub(crate) fn get_feed_titles(conn: &rusqlite::Connection) -> Result<Vec<(FeedId
 
 pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry, Error> {
     let result = conn.query_row(
-        "SELECT id, feed_id, title, author, pub_date, description, content, link, read_on, inserted_at, updated_at FROM entries WHERE id=?1",
-    params![entry_id],
-|row| {
+        "SELECT 
+          id, 
+          feed_id, 
+          title, 
+          author, 
+          pub_date, 
+          description, 
+          content, 
+          link, 
+          read_on, 
+          inserted_at, 
+          updated_at 
+        FROM entries WHERE id=?1",
+        params![entry_id],
+        |row| {
             Ok(Entry {
                 id: row.get(0)?,
                 feed_id: row.get(1)?,
@@ -192,7 +258,46 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
                 inserted_at: row.get(9)?,
                 updated_at: row.get(10)?,
             })
-        })?;
+        },
+    )?;
+
+    Ok(result)
+}
+
+pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<Entry>, Error> {
+    let mut statement = conn.prepare(
+        "SELECT 
+        id, 
+        feed_id, 
+        title, 
+        author, 
+        pub_date, 
+        description, 
+        content, 
+        link, 
+        read_on, 
+        inserted_at, 
+        updated_at 
+        FROM entries WHERE feed_id=?1",
+    )?;
+    let result = statement
+        .query_map(params![feed_id], |row| {
+            Ok(Entry {
+                id: row.get(0)?,
+                feed_id: row.get(1)?,
+                title: row.get(2)?,
+                author: row.get(3)?,
+                pub_date: row.get(4)?,
+                description: row.get(5)?,
+                content: row.get(6)?,
+                link: row.get(7)?,
+                read_on: row.get(8)?,
+                inserted_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        })?
+        .map(|entry| entry.unwrap())
+        .collect::<Vec<_>>();
 
     Ok(result)
 }
@@ -207,20 +312,6 @@ fn get_entries_links(
         .query_map(params![feed_id], |row| row.get(0))?
         .map(|s| s.unwrap())
         .collect::<HashSet<String>>();
-
-    Ok(result)
-}
-
-pub fn get_entries_titles(
-    conn: &rusqlite::Connection,
-    feed_id: FeedId,
-) -> Result<Vec<(EntryId, String)>, Error> {
-    let mut statement =
-        conn.prepare("SELECT id, title FROM entries WHERE feed_id=?1 ORDER BY pub_date DESC")?;
-    let result = statement
-        .query_map(params![feed_id], |row| Ok((row.get(0)?, row.get(1)?)))?
-        .map(|s| s.unwrap())
-        .collect::<Vec<(EntryId, String)>>();
 
     Ok(result)
 }
@@ -245,8 +336,6 @@ mod tests {
     #[tokio::test]
     async fn it_fetches() {
         let channel: rss::Channel = fetch_feed(ZCT).await.unwrap();
-
-        // println!("{:?}", channel.items().iter().take(1).collect::<Vec<_>>());
 
         assert!(channel.items().len() > 0)
     }

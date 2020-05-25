@@ -16,3 +16,7 @@ structopt = "0.3.14"
 rusqlite = { version = "0.23.1", features = ["chrono"] }
 tokio = { version = "0.2", features = ["full"] }
 tui = { version = "0.9", default-features = false, features = ['crossterm'] }
+
+[profile.release]
+lto = true
+codegen-units = 1
