@@ -123,9 +123,8 @@ impl<'a> App<'a> {
                 }
             }
             Selected::Entry(_) => {
-                match self.scroll.checked_sub(1) {
-                    Some(n) => self.scroll = n,
-                    None => (),
+                if let Some(n) = self.scroll.checked_sub(1) {
+                    self.scroll = n
                 };
             }
         }
@@ -155,9 +154,8 @@ impl<'a> App<'a> {
                 }
             }
             Selected::Entry(_) => {
-                match self.scroll.checked_add(1) {
-                    Some(n) => self.scroll = n,
-                    None => (),
+                if let Some(n) = self.scroll.checked_add(1) {
+                    self.scroll = n
                 };
             }
         }
@@ -273,21 +271,21 @@ impl<'a> App<'a> {
         match c {
             'q' => {
                 self.should_quit = true;
-                Ok(())
             }
             // vim-style movement
-            'h' => Ok(self.on_left()),
-            'j' => Ok(self.on_down()),
-            'k' => Ok(self.on_up()),
-            'l' => Ok(self.on_right().unwrap()),
+            'h' => self.on_left(),
+            'j' => self.on_down(),
+            'k' => self.on_up(),
+            'l' => self.on_right().unwrap(),
             // controls
-            'r' => self.on_refresh().await,
+            'r' => return self.on_refresh().await,
             'e' | 'i' => {
                 self.mode = Mode::Editing;
-                Ok(())
             }
-            _ => Ok(()),
+            _ => (),
         }
+
+        Ok(())
     }
 
     pub fn on_tick(&mut self) {
