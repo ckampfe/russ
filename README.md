@@ -3,8 +3,8 @@
 Russ is a really simple RSS reader built for my own use.
 If you happen to like it, that's great!
 
-<img src="entries.png">entries</img>
-<img src="entry.png">entry</img>
+<img src="entries.png"></img>
+<img src="entry.png"></img>
 
 ## install/use
 
