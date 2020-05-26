@@ -26,7 +26,6 @@ enum Event<I> {
     Tick,
 }
 
-/// Crossterm demo
 #[derive(Debug, StructOpt)]
 struct Options {
     /// feed database path
@@ -76,7 +75,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let mut app = App::new(
-        "Crossterm Demo",
+        "Russ",
         options.database_path,
         options.enhanced_graphics.unwrap_or_else(|| true),
     )

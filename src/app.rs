@@ -218,7 +218,9 @@ impl<'a> App<'a> {
                         .or_else(|| entry.description.as_ref())
                         .or_else(|| Some(&empty_string));
 
-                    let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 120);
+                    // TODO make this width configurable
+                    // TODO config should be in the database!
+                    let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 90);
 
                     let text = text
                         .split('\n')
