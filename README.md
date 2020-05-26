@@ -34,7 +34,7 @@ OPTIONS:
 
 ## design
 
-Russ is a [tui]() app that uses [crossterm](), so it should (???) work on Windows (I do not use Windows so I cannot verify this, but feel free to open an issue with an experience report)
+Russ is a [tui](https://crates.io/crates/tui) app that uses [crossterm](https://crates.io/crates/crossterm), so it should (???) work on Windows (I do not use Windows so I cannot verify this, but feel free to open an issue with an experience report)
 
 It stores all application data in a Sqlite database file at a location of your choosing. There is no default file. You need to specify this file when you start Russ (see above).
 
