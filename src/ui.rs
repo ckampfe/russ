@@ -123,7 +123,7 @@ where
                 text.push({
                     let mut s = String::new();
                     s.push_str("Most recent entry at: ");
-                    s.push_str(pub_date.to_owned().to_string().as_str());
+                    s.push_str(pub_date.to_string().as_str());
                     s.push_str("\n");
                     Text::raw(s)
                 })
@@ -134,7 +134,7 @@ where
             .current_feed
             .as_ref()
             .and_then(|feed| feed.refreshed_at)
-            .and_then(|timestamp| Some(timestamp.to_owned().to_string()))
+            .map(|timestamp| timestamp.to_owned().to_string())
             .or_else(|| Some("Never refreshed".to_string()))
         {
             text.push({
