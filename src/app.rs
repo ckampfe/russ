@@ -87,8 +87,13 @@ impl<'a> App<'a> {
         let current_feed = if self.feed_titles.items.is_empty() {
             None
         } else {
-            self.feed_titles.state.select(Some(0));
-            let selected_idx = self.feed_titles.state.selected().unwrap();
+            let selected_idx = match self.feed_titles.state.selected() {
+                Some(idx) => idx,
+                None => {
+                    self.feed_titles.state.select(Some(0));
+                    0
+                }
+            };
             let feed_id = self.feed_titles.items[selected_idx].0;
             Some(crate::rss::get_feed(&self.conn, feed_id)?)
         };
@@ -278,19 +283,8 @@ impl<'a> App<'a> {
     pub async fn on_refresh(&mut self) -> Result<(), Error> {
         let selected_idx = self.feed_titles.state.selected().unwrap();
         let feed_id = self.feed_titles.items[selected_idx].0;
-
         let _ = crate::rss::refresh_feed(&self.conn, feed_id).await?;
-        // and refresh the in-memory feed
-        let current_feed = crate::rss::get_feed(&self.conn, feed_id)?;
-        self.current_feed = Some(current_feed);
-
-        let entries = crate::rss::get_entries(&self.conn, feed_id)
-            .unwrap()
-            .into_iter()
-            .collect::<Vec<_>>()
-            .into();
-
-        self.entries = entries;
+        self.update_current_feed_and_entries()?;
         Ok(())
     }
 
