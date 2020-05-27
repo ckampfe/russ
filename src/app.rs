@@ -128,24 +128,11 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn on_up(&mut self) {
+    pub fn on_up(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
                 self.feed_titles.previous();
-
-                let selected_idx = self.feed_titles.state.selected().unwrap();
-                let feed_id = self.feed_titles.items[selected_idx].0;
-
-                let current_feed = crate::rss::get_feed(&self.conn, feed_id).unwrap();
-                self.current_feed = Some(current_feed);
-
-                let entries = crate::rss::get_entries(&self.conn, feed_id)
-                    .unwrap()
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into();
-
-                self.entries = entries;
+                self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
@@ -158,26 +145,15 @@ impl<'a> App<'a> {
                 };
             }
         }
+
+        Ok(())
     }
 
-    pub fn on_down(&mut self) {
+    pub fn on_down(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
                 self.feed_titles.next();
-
-                let selected_idx = self.feed_titles.state.selected().unwrap();
-                let feed_id = self.feed_titles.items[selected_idx].0;
-
-                let current_feed = crate::rss::get_feed(&self.conn, feed_id).unwrap();
-                self.current_feed = Some(current_feed);
-
-                let entries = crate::rss::get_entries(&self.conn, feed_id)
-                    .unwrap()
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into();
-
-                self.entries = entries;
+                self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
@@ -190,6 +166,8 @@ impl<'a> App<'a> {
                 };
             }
         }
+
+        Ok(())
     }
 
     pub fn on_right(&mut self) -> Result<(), Error> {
@@ -295,8 +273,8 @@ impl<'a> App<'a> {
             }
             // vim-style movement
             'h' => self.on_left(),
-            'j' => self.on_down(),
-            'k' => self.on_up(),
+            'j' => self.on_down()?,
+            'k' => self.on_up()?,
             'l' => self.on_right().unwrap(),
             // controls
             'r' => return self.on_refresh().await,

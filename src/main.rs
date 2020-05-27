@@ -95,10 +95,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Char(c) => app.on_key(c).await?,
                         KeyCode::Left => app.on_left(),
-                        KeyCode::Up => app.on_up(),
-                        KeyCode::Right => app.on_right().unwrap(),
-                        KeyCode::Down => app.on_down(),
-                        KeyCode::Enter => app.on_enter().unwrap(),
+                        KeyCode::Up => app.on_up()?,
+                        KeyCode::Right => app.on_right()?,
+                        KeyCode::Down => app.on_down()?,
+                        KeyCode::Enter => app.on_enter()?,
                         KeyCode::Esc => app.on_esc(),
                         _ => {}
                     },
@@ -127,7 +127,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Esc => {
                             app.mode = Mode::Normal;
-                            // events.enable_exit_key();
                         }
                         _ => {}
                     },
