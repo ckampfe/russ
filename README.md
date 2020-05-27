@@ -36,10 +36,11 @@ OPTIONS:
 ## goals
 
 1. A usable RSS client in the terminal, not in a webpage
-2. Set up how I like it (vim-style navigation, columnar layout with higher-level info on the left, content on the right)
-3. All application data in SQLite
-4. Minimal configuration/options
-5. As little resource usage as possible
+1. Set up how I like it (vim-style navigation, columnar layout with higher-level info on the left, content on the right)
+1. Fully offline operation
+1. All application data in SQLite
+1. Minimal configuration/options
+1. As little resource usage as possible
 
 ## design
 
