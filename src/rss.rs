@@ -349,14 +349,6 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM entries", NO_PARAMS, |row| row.get(0))
             .unwrap();
 
-        let mut s = conn.prepare("SELECT title FROM entries").unwrap();
-        let titles = s.query_map(NO_PARAMS, |row| row.get(0)).unwrap();
-
-        for title in titles {
-            let t: String = title.unwrap();
-            // println!("{}", t);
-        }
-
         assert!(count > 50)
     }
 
