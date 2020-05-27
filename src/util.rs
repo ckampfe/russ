@@ -53,3 +53,9 @@ impl<T> StatefulList<T> {
     //     self.state.select(None);
     // }
 }
+
+impl<T> From<Vec<T>> for StatefulList<T> {
+    fn from(other: Vec<T>) -> Self {
+        StatefulList::with_items(other)
+    }
+}

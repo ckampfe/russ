@@ -35,39 +35,19 @@ pub(crate) struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub(crate) async fn new(
+    pub(crate) fn new(
         title: &'a str,
         database_path: PathBuf,
         enhanced_graphics: bool,
     ) -> Result<App<'a>, Error> {
         let conn = rusqlite::Connection::open(&database_path)?;
         crate::rss::initialize_db(&conn)?;
-        // crate::rss::subscribe_to_feed(&conn, "https://zeroclarkthirty.com/feed").await?;
-        // crate::rss::subscribe_to_feed(&conn, "https://danielmiessler.com/feed/").await?;
-        let mut feed_titles = util::StatefulList::with_items(crate::rss::get_feed_titles(&conn)?);
-
+        let initial_feed_titles = vec![].into();
         let selected = Selected::Feeds;
+        let initial_current_feed = None;
+        let initial_entries = vec![].into();
 
-        let current_feed = if feed_titles.items.is_empty() {
-            None
-        } else {
-            feed_titles.state.select(Some(0));
-            let selected_idx = feed_titles.state.selected().unwrap();
-            let feed_id = feed_titles.items[selected_idx].0;
-            Some(crate::rss::get_feed(&conn, feed_id)?)
-        };
-
-        let entries = if let Some(feed) = &current_feed {
-            let entries = crate::rss::get_entries(&conn, feed.id)?
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            util::StatefulList::with_items(entries)
-        } else {
-            util::StatefulList::with_items(vec![])
-        };
-
-        let app = App {
+        let mut app = App {
             title,
             database_path,
             conn,
@@ -75,17 +55,61 @@ impl<'a> App<'a> {
             progress: 0.0,
             should_quit: false,
             error_flash: None,
-            feed_titles,
-            entries,
+            feed_titles: initial_feed_titles,
+            entries: initial_entries,
             selected,
             scroll: 0,
             current_entry_text: vec![],
-            current_feed,
+            current_feed: initial_current_feed,
             input: String::new(),
             mode: Mode::Normal,
         };
 
+        app.update_feed_titles()?;
+        app.update_current_feed_and_entries()?;
+
         Ok(app)
+    }
+
+    pub fn update_feed_titles(&mut self) -> Result<(), Error> {
+        let feed_titles = crate::rss::get_feed_titles(&self.conn)?.into();
+        self.feed_titles = feed_titles;
+        Ok(())
+    }
+
+    pub fn update_current_feed_and_entries(&mut self) -> Result<(), Error> {
+        self.update_current_feed()?;
+        self.update_current_entries()?;
+        Ok(())
+    }
+
+    fn update_current_feed(&mut self) -> Result<(), Error> {
+        let current_feed = if self.feed_titles.items.is_empty() {
+            None
+        } else {
+            self.feed_titles.state.select(Some(0));
+            let selected_idx = self.feed_titles.state.selected().unwrap();
+            let feed_id = self.feed_titles.items[selected_idx].0;
+            Some(crate::rss::get_feed(&self.conn, feed_id)?)
+        };
+
+        self.current_feed = current_feed;
+
+        Ok(())
+    }
+
+    fn update_current_entries(&mut self) -> Result<(), Error> {
+        let entries = if let Some(feed) = &self.current_feed {
+            crate::rss::get_entries(&self.conn, feed.id)?
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into()
+        } else {
+            vec![].into()
+        };
+
+        self.entries = entries;
+        Ok(())
     }
 
     pub async fn select_feeds(&mut self) {
@@ -94,7 +118,7 @@ impl<'a> App<'a> {
 
     pub async fn subscribe_to_feed(&mut self) -> Result<(), Error> {
         let _feed_id = crate::rss::subscribe_to_feed(&self.conn, &self.input).await?;
-        let feed_titles = util::StatefulList::with_items(crate::rss::get_feed_titles(&self.conn)?);
+        let feed_titles = crate::rss::get_feed_titles(&self.conn)?.into();
         self.feed_titles = feed_titles;
         Ok(())
     }
@@ -113,9 +137,10 @@ impl<'a> App<'a> {
                 let entries = crate::rss::get_entries(&self.conn, feed_id)
                     .unwrap()
                     .into_iter()
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+                    .into();
 
-                self.entries = util::StatefulList::with_items(entries);
+                self.entries = entries;
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
@@ -144,9 +169,10 @@ impl<'a> App<'a> {
                 let entries = crate::rss::get_entries(&self.conn, feed_id)
                     .unwrap()
                     .into_iter()
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+                    .into();
 
-                self.entries = util::StatefulList::with_items(entries);
+                self.entries = entries;
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
@@ -261,9 +287,10 @@ impl<'a> App<'a> {
         let entries = crate::rss::get_entries(&self.conn, feed_id)
             .unwrap()
             .into_iter()
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .into();
 
-        self.entries = util::StatefulList::with_items(entries);
+        self.entries = entries;
         Ok(())
     }
 

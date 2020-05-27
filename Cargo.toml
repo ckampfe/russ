@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.11"
+crossbeam-channel = "0.4.2"
 crossterm = "0.17"
 html2text = "0.1.11"
 reqwest = { version = "0.10" }

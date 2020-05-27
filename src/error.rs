@@ -5,6 +5,7 @@ pub enum Error {
     NetworkError(reqwest::Error),
     RssError(rss::Error),
     DatabaseError(rusqlite::Error),
+    ChannelError(crossbeam_channel::RecvError),
 }
 
 impl std::error::Error for Error {}
@@ -30,5 +31,11 @@ impl From<rss::Error> for Error {
 impl From<rusqlite::Error> for Error {
     fn from(error: rusqlite::Error) -> Error {
         Error::DatabaseError(error)
+    }
+}
+
+impl From<crossbeam_channel::RecvError> for Error {
+    fn from(error: crossbeam_channel::RecvError) -> Error {
+        Error::ChannelError(error)
     }
 }

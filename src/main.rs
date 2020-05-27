@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::{
     error::Error,
     io::{stdout, Write},
-    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -55,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     terminal.hide_cursor()?;
 
     // Setup input handling
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = crossbeam_channel::unbounded();
 
     let tick_rate = Duration::from_millis(options.tick_rate);
     thread::spawn(move || {
@@ -78,8 +77,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "Russ",
         options.database_path,
         options.enhanced_graphics.unwrap_or_else(|| true),
-    )
-    .await?;
+    )?;
 
     terminal.clear()?;
 
@@ -119,27 +117,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             app.subscribe_to_feed().await?;
                             app.input = String::new();
                             app.select_feeds().await;
-
-                            let current_feed = if app.feed_titles.items.is_empty() {
-                                None
-                            } else {
-                                app.feed_titles.state.select(Some(0));
-                                let selected_idx = app.feed_titles.state.selected().unwrap();
-                                let feed_id = app.feed_titles.items[selected_idx].0;
-                                Some(crate::rss::get_feed(&app.conn, feed_id)?)
-                            };
-
-                            let entries = if let Some(feed) = &current_feed {
-                                let entries = crate::rss::get_entries(&app.conn, feed.id)?
-                                    .into_iter()
-                                    .collect::<Vec<_>>();
-
-                                util::StatefulList::with_items(entries)
-                            } else {
-                                util::StatefulList::with_items(vec![])
-                            };
-
-                            app.entries = entries;
+                            app.update_current_feed_and_entries()?;
                         }
                         KeyCode::Char(c) => {
                             app.input.push(c);
