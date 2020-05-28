@@ -57,6 +57,7 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] config (in db)
 - [ ] deleting feeds
 - [ ] better feed refreshing functionality
+- [x] display info about an individual entry
 - [x] rss support
 - [x] adding feeds in-app
 - [x] vim-style hjkl navigation
