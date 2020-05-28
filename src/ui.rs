@@ -7,6 +7,7 @@ use tui::{
 };
 
 use crate::app::{App, Mode, Selected};
+use crate::rss::Entry;
 
 pub(crate) fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
@@ -52,7 +53,17 @@ where
         draw_feeds(f, chunks[0], app);
 
         // INFO
-        draw_feed_info(f, chunks[1], app);
+        match &app.selected {
+            Selected::Entry(entry) => draw_entry_info(f, chunks[1], entry),
+            Selected::Entries => {
+                if let Some(entry) = &app.current_entry {
+                    draw_entry_info(f, chunks[1], entry);
+                } else {
+                    draw_feed_info(f, chunks[1], app);
+                }
+            }
+            _ => draw_feed_info(f, chunks[1], app),
+        }
 
         // HELP SECTION
         draw_help(f, chunks[2], app);
@@ -60,6 +71,51 @@ where
         // INPUT SECTION
         draw_new_feed_input(f, chunks[3], app);
     }
+}
+
+fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry: &Entry)
+where
+    B: Backend,
+{
+    let mut text = vec![];
+    if let Some(item) = &entry.title {
+        text.push({
+            let mut s = String::new();
+            s.push_str("Title: ");
+            s.push_str(item.to_string().as_str());
+            s.push_str("\n");
+            Text::raw(s)
+        });
+    }
+
+    if let Some(item) = &entry.link {
+        text.push({
+            let mut s = String::new();
+            s.push_str("Link: ");
+            s.push_str(item.to_string().as_str());
+            s.push_str("\n");
+            Text::raw(s)
+        })
+    }
+
+    if let Some(pub_date) = &entry.pub_date {
+        text.push({
+            let mut s = String::new();
+            s.push_str("Pub. date: ");
+            s.push_str(pub_date.to_string().as_str());
+            s.push_str("\n");
+            Text::raw(s)
+        })
+    }
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Info")
+        .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+
+    let paragraph = Paragraph::new(text.iter()).block(block).wrap(true);
+
+    f.render_widget(paragraph, area);
 }
 
 fn draw_feeds<B>(f: &mut Frame<B>, area: Rect, app: &mut App)

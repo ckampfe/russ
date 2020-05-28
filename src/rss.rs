@@ -119,7 +119,7 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
         feed_id INTEGER,
         title TEXT,
         author TEXT,
-        pub_date TEXT,
+        pub_date TIMESTAMP,
         description TEXT,
         content TEXT,
         link TEXT,
@@ -265,6 +265,8 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
 }
 
 pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<Entry>, Error> {
+    // we get weird pubDate formats from feeds,
+    // so sort by inserted at as this as a stable order at least
     let mut statement = conn.prepare(
         "SELECT 
         id, 
@@ -278,7 +280,9 @@ pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<E
         read_on, 
         inserted_at, 
         updated_at 
-        FROM entries WHERE feed_id=?1",
+        FROM entries 
+        WHERE feed_id=?1
+        ORDER BY inserted_at DESC",
     )?;
     let result = statement
         .query_map(params![feed_id], |row| {

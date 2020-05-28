@@ -28,6 +28,7 @@ pub(crate) struct App<'a> {
     pub entries: util::StatefulList<crate::rss::Entry>,
     pub selected: Selected,
     pub scroll: u16,
+    pub current_entry: Option<crate::rss::Entry>,
     pub current_entry_text: Vec<tui::widgets::Text<'a>>,
     pub current_feed: Option<crate::rss::Feed>,
     pub input: String,
@@ -59,6 +60,7 @@ impl<'a> App<'a> {
             entries: initial_entries,
             selected,
             scroll: 0,
+            current_entry: None,
             current_entry_text: vec![],
             current_feed: initial_current_feed,
             input: String::new(),
@@ -136,7 +138,11 @@ impl<'a> App<'a> {
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
-                    self.entries.previous()
+                    self.entries.previous();
+                    let selected_idx = self.entries.state.selected().unwrap();
+                    let entry_id = self.entries.items[selected_idx].id;
+                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
+                    self.current_entry = Some(entry);
                 }
             }
             Selected::Entry(_) => {
@@ -157,7 +163,11 @@ impl<'a> App<'a> {
             }
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
-                    self.entries.next()
+                    self.entries.next();
+                    let selected_idx = self.entries.state.selected().unwrap();
+                    let entry_id = self.entries.items[selected_idx].id;
+                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
+                    self.current_entry = Some(entry);
                 }
             }
             Selected::Entry(_) => {
@@ -175,7 +185,11 @@ impl<'a> App<'a> {
             Selected::Feeds => {
                 self.selected = Selected::Entries;
                 if !self.entries.items.is_empty() {
-                    self.entries.state.select(Some(0))
+                    self.entries.state.select(Some(0));
+                    let selected_idx = self.entries.state.selected().unwrap();
+                    let entry_id = self.entries.items[selected_idx].id;
+                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
+                    self.current_entry = Some(entry);
                 }
                 Ok(())
             }
@@ -207,41 +221,39 @@ impl<'a> App<'a> {
         match self.selected {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
-                    let selected_idx = self.entries.state.selected().unwrap();
-                    let entry_id = self.entries.items[selected_idx].id;
-                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
+                    if let Some(entry) = &self.current_entry {
+                        let empty_string = String::from("No content or description tag provided.");
 
-                    let empty_string = String::from("No content or description tag provided.");
+                        // try content tag first,
+                        // if there is not content tag,
+                        // go to description tag,
+                        // if no description tag,
+                        // use empty string.
+                        // TODO figure out what to actually do if there are neither
+                        let entry_text = &entry
+                            .content
+                            .as_ref()
+                            .or_else(|| entry.description.as_ref())
+                            .or_else(|| Some(&empty_string));
 
-                    // try content tag first,
-                    // if there is not content tag,
-                    // go to description tag,
-                    // if no description tag,
-                    // use empty string.
-                    // TODO figure out what to actually do if there are neither
-                    let entry_text = &entry
-                        .content
-                        .as_ref()
-                        .or_else(|| entry.description.as_ref())
-                        .or_else(|| Some(&empty_string));
+                        // TODO make this width configurable
+                        // TODO config should be in the database!
+                        let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 90);
 
-                    // TODO make this width configurable
-                    // TODO config should be in the database!
-                    let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 90);
-
-                    let text = text
-                        .split('\n')
-                        .map(|line| {
-                            tui::widgets::Text::raw({
-                                let mut owned = line.to_owned();
-                                owned.push_str("\n");
-                                owned
+                        let text = text
+                            .split('\n')
+                            .map(|line| {
+                                tui::widgets::Text::raw({
+                                    let mut owned = line.to_owned();
+                                    owned.push_str("\n");
+                                    owned
+                                })
                             })
-                        })
-                        .collect::<Vec<_>>();
+                            .collect::<Vec<_>>();
 
-                    self.selected = Selected::Entry(entry);
-                    self.current_entry_text = text;
+                        self.selected = Selected::Entry(entry.clone());
+                        self.current_entry_text = text;
+                    }
                 }
 
                 Ok(())
