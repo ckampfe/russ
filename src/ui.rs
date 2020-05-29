@@ -110,6 +110,17 @@ where
             s.push_str("\n");
             Text::raw(s)
         })
+    } else {
+        // TODO this should probably pull the <updated> tag
+        // and use that
+        let inserted_at = entry.inserted_at;
+        text.push({
+            let mut s = String::new();
+            s.push_str("Pulled date: ");
+            s.push_str(inserted_at.to_string().as_str());
+            s.push_str("\n");
+            Text::raw(s)
+        })
     }
 
     let block = Block::default()
