@@ -12,7 +12,7 @@ chrono = "0.4.11"
 crossbeam-channel = "0.4.2"
 crossterm = "0.17"
 html2text = "0.1.11"
-reqwest = { version = "0.10" }
+reqwest = "0.10"
 rss = "1.9.0"
 structopt = "0.3.14"
 rusqlite = { version = "0.23.1", features = ["chrono"] }
