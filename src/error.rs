@@ -1,10 +1,13 @@
+use atom_syndication as atom;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum Error {
     NetworkError(reqwest::Error),
+    AtomError(atom::Error),
     RssError(rss::Error),
     DatabaseError(rusqlite::Error),
+    FeedKindError(String),
     ChannelError(crossbeam_channel::RecvError),
 }
 
@@ -19,6 +22,12 @@ impl fmt::Display for Error {
 impl From<reqwest::Error> for Error {
     fn from(error: reqwest::Error) -> Error {
         Error::NetworkError(error)
+    }
+}
+
+impl From<atom::Error> for Error {
+    fn from(error: atom::Error) -> Error {
+        Error::AtomError(error)
     }
 }
 

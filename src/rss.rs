@@ -1,4 +1,5 @@
 use crate::error::Error;
+use atom_syndication as atom;
 use chrono::prelude::*;
 use rss::Channel;
 use rusqlite::{params, NO_PARAMS};
@@ -8,12 +9,43 @@ use std::str::FromStr;
 type EntryId = i64;
 type FeedId = i64;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FeedKind {
+    Atom,
+    RSS,
+}
+
+impl ToString for FeedKind {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Atom => "Atom".to_string(),
+            Self::RSS => "RSS".to_string(),
+        }
+    }
+}
+
+impl FromStr for FeedKind {
+    type Err = crate::error::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Atom" => Ok(FeedKind::Atom),
+            "RSS" => Ok(FeedKind::RSS),
+            _ => Err(crate::error::Error::FeedKindError(format!(
+                "{} is not a valid FeedKind",
+                s
+            ))),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Feed {
     pub id: FeedId,
     pub title: Option<String>,
     pub feed_link: Option<String>,
     pub link: Option<String>,
+    pub feed_kind: FeedKind,
     pub refreshed_at: Option<chrono::DateTime<Utc>>,
     pub inserted_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
@@ -34,25 +66,167 @@ pub struct Entry {
     pub updated_at: chrono::DateTime<Utc>,
 }
 
+struct InternalFeed {
+    pub id: FeedId,
+    pub title: Option<String>,
+    pub feed_link: Option<String>,
+    pub link: Option<String>,
+    pub feed_kind: FeedKind,
+    pub refreshed_at: Option<chrono::DateTime<Utc>>,
+    pub inserted_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+    pub entries: Vec<InternalEntry>,
+}
+
+impl InternalFeed {
+    pub fn title(&self) -> Option<String> {
+        self.title.clone()
+    }
+    pub fn link(&self) -> Option<String> {
+        self.link.clone()
+    }
+    pub fn feed_link(&self) -> Option<String> {
+        self.feed_link.clone()
+    }
+    pub fn feed_kind(&self) -> FeedKind {
+        self.feed_kind
+    }
+    pub fn entries(&self) -> Vec<InternalEntry> {
+        self.entries.clone()
+    }
+    pub fn set_feed_link(&mut self, url: &str) {
+        self.feed_link = Some(url.to_owned());
+    }
+}
+
+impl FromStr for InternalFeed {
+    type Err = crate::error::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match atom::Feed::from_str(s) {
+            Ok(feed) => Ok(Self {
+                id: 0,
+                title: Some(feed.title.clone()),
+                feed_link: None,
+                link: feed.links.get(0).map(|link| link.href().to_string()),
+                feed_kind: FeedKind::Atom,
+                refreshed_at: None,
+                inserted_at: Utc::now(),
+                updated_at: Utc::now(),
+                entries: feed
+                    .entries()
+                    .into_iter()
+                    .map(|entry| entry.into())
+                    .collect::<Vec<_>>(),
+            }),
+            Err(_e) => match Channel::from_str(s) {
+                Ok(channel) => Ok(Self {
+                    id: 0,
+                    title: Some(channel.title().to_string()),
+                    feed_link: None,
+                    link: Some(channel.link().to_string()),
+                    feed_kind: FeedKind::RSS,
+                    refreshed_at: None,
+                    inserted_at: Utc::now(),
+                    updated_at: Utc::now(),
+                    entries: channel
+                        .items()
+                        .iter()
+                        .map(|item| item.into())
+                        .collect::<Vec<_>>(),
+                }),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct InternalEntry {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub pub_date: Option<String>,
+    pub description: Option<String>,
+    pub content: Option<String>,
+    pub link: Option<String>,
+    pub read_on: Option<chrono::DateTime<Utc>>,
+    pub inserted_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+impl InternalEntry {
+    pub fn link(&self) -> Option<String> {
+        self.link.clone()
+    }
+    pub fn title(&self) -> Option<String> {
+        self.title.clone()
+    }
+    pub fn author(&self) -> Option<String> {
+        self.author.clone()
+    }
+    pub fn pub_date(&self) -> Option<String> {
+        self.pub_date.clone()
+    }
+    pub fn description(&self) -> Option<String> {
+        self.description.clone()
+    }
+    pub fn content(&self) -> Option<String> {
+        self.content.clone()
+    }
+}
+
+impl From<&atom::Entry> for InternalEntry {
+    fn from(entry: &atom::Entry) -> Self {
+        Self {
+            title: Some(entry.title().to_string()),
+            author: entry.authors().get(0).map(|author| author.name.to_owned()),
+            pub_date: entry.published().map(|date| date.to_string()),
+            description: None,
+            content: entry.content().and_then(|content| content.value.to_owned()),
+            link: entry.links().get(0).map(|link| link.href().to_string()),
+            read_on: None,
+            inserted_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+impl From<&rss::Item> for InternalEntry {
+    fn from(entry: &rss::Item) -> Self {
+        Self {
+            title: entry.title().map(|title| title.to_owned()),
+            author: entry.author().map(|author| author.to_owned()),
+            pub_date: entry.pub_date().map(|pub_date| pub_date.to_owned()),
+            description: entry
+                .description()
+                .map(|description| description.to_owned()),
+            content: entry.content().map(|content| content.to_owned()),
+            link: entry.link().map(|link| link.to_owned()),
+            read_on: None,
+            inserted_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
 pub(crate) async fn subscribe_to_feed(
     conn: &rusqlite::Connection,
     url: &str,
 ) -> Result<FeedId, Error> {
-    let feed: Channel = fetch_feed(url).await?;
-    let feed_id = create_feed(conn, &feed, url)?;
+    let feed: InternalFeed = fetch_feed(url).await?;
+    let feed_id = create_feed(conn, &feed)?;
     // N+1!!!! YEAH BABY
-    for item in feed.items() {
-        add_item_to_feed(conn, feed_id, item)?;
+    for entry in feed.entries() {
+        add_entry_to_feed(conn, feed_id, &entry)?;
     }
 
     Ok(feed_id)
 }
 
-async fn fetch_feed(url: &str) -> Result<Channel, Error> {
+async fn fetch_feed(url: &str) -> Result<InternalFeed, Error> {
     let resp = reqwest::get(url).await?.text().await?;
-    let channel = Channel::from_str(&resp)?;
+    let mut feed = InternalFeed::from_str(&resp)?;
+    feed.set_feed_link(url);
 
-    Ok(channel)
+    Ok(feed)
 }
 
 /// fetches the feed and stores the new entries
@@ -63,19 +237,19 @@ pub async fn refresh_feed(
     feed_id: FeedId,
 ) -> Result<Vec<EntryId>, Error> {
     let feed_url = get_feed_url(conn, feed_id)?;
-    let remote_feed: Channel = fetch_feed(&feed_url).await?;
-    let remote_items = remote_feed.items();
+    let remote_feed: InternalFeed = fetch_feed(&feed_url).await?;
+    let remote_items = remote_feed.entries();
     let remote_items_links = remote_items
         .iter()
         .flat_map(|item| item.link())
-        .collect::<HashSet<&str>>();
+        .collect::<HashSet<String>>();
     let local_entries_links = get_entries_links(conn, feed_id)?;
 
     let difference = remote_items_links
         .difference(
             &local_entries_links
-                .iter()
-                .map(|i| i.as_ref())
+                .into_iter()
+                .map(|i| i)
                 .collect::<HashSet<_>>(),
         )
         .cloned()
@@ -84,12 +258,12 @@ pub async fn refresh_feed(
     let mut inserted_item_ids = vec![];
 
     let items_to_add = remote_items.iter().filter(|item| match item.link() {
-        Some(link) => difference.contains(link),
+        Some(link) => difference.contains(link.as_str()),
         None => false,
     });
 
     for item in items_to_add {
-        let item_id = add_item_to_feed(conn, feed_id, item)?;
+        let item_id = add_entry_to_feed(conn, feed_id, item)?;
         inserted_item_ids.push(item_id);
     }
 
@@ -106,6 +280,7 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
         title TEXT,
         feed_link TEXT,
         link TEXT,
+        feed_kind TEXT,
         refreshed_at TIMESTAMP,
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -133,24 +308,25 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_feed(
-    conn: &rusqlite::Connection,
-    feed: &Channel,
-    feed_link: &str,
-) -> Result<FeedId, Error> {
+fn create_feed(conn: &rusqlite::Connection, feed: &InternalFeed) -> Result<FeedId, Error> {
     conn.execute(
-        "INSERT INTO feeds (title, link, feed_link)
-        VALUES (?1, ?2, ?3)",
-        params![feed.title(), feed.link(), feed_link],
+        "INSERT INTO feeds (title, link, feed_link, feed_kind)
+        VALUES (?1, ?2, ?3, ?4)",
+        params![
+            feed.title(),
+            feed.link(),
+            feed.feed_link(),
+            feed.feed_kind().to_string()
+        ],
     )?;
 
     Ok(conn.last_insert_rowid())
 }
 
-fn add_item_to_feed(
+fn add_entry_to_feed(
     conn: &rusqlite::Connection,
     feed_id: FeedId,
-    item: &rss::Item,
+    entry: &InternalEntry,
 ) -> Result<EntryId, Error> {
     conn.execute(
         "INSERT INTO entries (
@@ -166,12 +342,12 @@ fn add_item_to_feed(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             feed_id,
-            item.title(),
-            item.author(),
-            item.pub_date(),
-            item.description(),
-            item.content(),
-            item.link(),
+            entry.title(),
+            entry.author(),
+            entry.pub_date(),
+            entry.description(),
+            entry.content(),
+            entry.link(),
             Utc::now()
         ],
     )?;
@@ -181,17 +357,20 @@ fn add_item_to_feed(
 
 pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed, Error> {
     let s = conn.query_row(
-        "SELECT id, title, feed_link, link, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
+        "SELECT id, title, feed_link, link, feed_kind, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
         params![feed_id],
         |row| {
+            let feed_kind_str: String = row.get(4)?;
+            let feed_kind: FeedKind = FeedKind::from_str(&feed_kind_str).unwrap();
             Ok(Feed {
                 id: row.get(0)?,
                 title: row.get(1)?,
                 feed_link: row.get(2)?,
                 link: row.get(3)?,
-                refreshed_at: row.get(4)?,
-                inserted_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                feed_kind,
+                refreshed_at: row.get(5)?,
+                inserted_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         },
     )?;

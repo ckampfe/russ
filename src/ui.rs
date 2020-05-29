@@ -62,7 +62,11 @@ where
                     draw_feed_info(f, chunks[1], app);
                 }
             }
-            _ => draw_feed_info(f, chunks[1], app),
+            _ => {
+                if app.current_feed.is_some() {
+                    draw_feed_info(f, chunks[1], app);
+                }
+            }
         }
 
         // HELP SECTION
@@ -92,7 +96,7 @@ where
         text.push({
             let mut s = String::new();
             s.push_str("Link: ");
-            s.push_str(item.to_string().as_str());
+            s.push_str(item);
             s.push_str("\n");
             Text::raw(s)
         })
@@ -231,6 +235,16 @@ where
         s.push_str("\n");
         Text::raw(s)
     });
+
+    if let Some(feed_kind) = app.current_feed.as_ref().map(|feed| feed.feed_kind) {
+        text.push({
+            let mut s = String::new();
+            s.push_str("Feed kind: ");
+            s.push_str(&feed_kind.to_string());
+            s.push_str("\n");
+            Text::raw(s)
+        });
+    }
 
     let block = Block::default()
         .borders(Borders::ALL)
