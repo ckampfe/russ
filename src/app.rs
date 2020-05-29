@@ -130,6 +130,18 @@ impl<'a> App<'a> {
         Ok(())
     }
 
+    fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry, Error>> {
+        if let Some(selected_idx) = self.entries.state.selected() {
+            if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
+                Some(crate::rss::get_entry(&self.conn, entry_id))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn on_up(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
@@ -139,10 +151,10 @@ impl<'a> App<'a> {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
                     self.entries.previous();
-                    let selected_idx = self.entries.state.selected().unwrap();
-                    let entry_id = self.entries.items[selected_idx].id;
-                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
-                    self.current_entry = Some(entry);
+                    if let Some(entry) = self.get_selected_entry() {
+                        let entry = entry?;
+                        self.current_entry = Some(entry);
+                    }
                 }
             }
             Selected::Entry(_) => {
@@ -164,10 +176,10 @@ impl<'a> App<'a> {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
                     self.entries.next();
-                    let selected_idx = self.entries.state.selected().unwrap();
-                    let entry_id = self.entries.items[selected_idx].id;
-                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
-                    self.current_entry = Some(entry);
+                    if let Some(entry) = self.get_selected_entry() {
+                        let entry = entry?;
+                        self.current_entry = Some(entry);
+                    }
                 }
             }
             Selected::Entry(_) => {
@@ -186,10 +198,10 @@ impl<'a> App<'a> {
                 self.selected = Selected::Entries;
                 if !self.entries.items.is_empty() {
                     self.entries.state.select(Some(0));
-                    let selected_idx = self.entries.state.selected().unwrap();
-                    let entry_id = self.entries.items[selected_idx].id;
-                    let entry = crate::rss::get_entry(&self.conn, entry_id)?;
-                    self.current_entry = Some(entry);
+                    if let Some(entry) = self.get_selected_entry() {
+                        let entry = entry?;
+                        self.current_entry = Some(entry);
+                    }
                 }
                 Ok(())
             }

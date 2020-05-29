@@ -518,9 +518,9 @@ mod tests {
 
     #[tokio::test]
     async fn it_fetches() {
-        let channel: rss::Channel = fetch_feed(ZCT).await.unwrap();
+        let channel = fetch_feed(ZCT).await.unwrap();
 
-        assert!(channel.items().len() > 0)
+        assert!(channel.entries().len() > 0)
     }
 
     #[tokio::test]
