@@ -16,8 +16,8 @@ pub enum Mode {
 }
 
 #[derive(Debug)]
-pub(crate) struct App<'a> {
-    pub title: &'a str,
+pub(crate) struct App<'app> {
+    pub title: &'app str,
     pub database_path: PathBuf,
     pub conn: rusqlite::Connection,
     pub enhanced_graphics: bool,
@@ -29,18 +29,18 @@ pub(crate) struct App<'a> {
     pub selected: Selected,
     pub scroll: u16,
     pub current_entry: Option<crate::rss::Entry>,
-    pub current_entry_text: Vec<tui::widgets::Text<'a>>,
+    pub current_entry_text: Vec<tui::widgets::Text<'app>>,
     pub current_feed: Option<crate::rss::Feed>,
     pub input: String,
     pub mode: Mode,
 }
 
-impl<'a> App<'a> {
+impl<'app> App<'app> {
     pub(crate) fn new(
-        title: &'a str,
+        title: &'app str,
         database_path: PathBuf,
         enhanced_graphics: bool,
-    ) -> Result<App<'a>, Error> {
+    ) -> Result<App<'app>, Error> {
         let conn = rusqlite::Connection::open(&database_path)?;
         crate::rss::initialize_db(&conn)?;
         let initial_feed_titles = vec![].into();
