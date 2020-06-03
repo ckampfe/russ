@@ -15,6 +15,12 @@ pub enum Mode {
     Normal,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ReadMode {
+    ShowAll,
+    ShowUnread,
+}
+
 #[derive(Debug)]
 pub(crate) struct App<'app> {
     pub title: &'app str,
@@ -33,6 +39,8 @@ pub(crate) struct App<'app> {
     pub current_feed: Option<crate::rss::Feed>,
     pub input: String,
     pub mode: Mode,
+    pub read_mode: ReadMode,
+    pub entry_selection_position: usize,
 }
 
 impl<'app> App<'app> {
@@ -65,6 +73,8 @@ impl<'app> App<'app> {
             current_feed: initial_current_feed,
             input: String::new(),
             mode: Mode::Normal,
+            read_mode: ReadMode::ShowUnread,
+            entry_selection_position: 0,
         };
 
         app.update_feed_titles()?;
@@ -107,7 +117,7 @@ impl<'app> App<'app> {
 
     fn update_current_entries(&mut self) -> Result<(), Error> {
         let entries = if let Some(feed) = &self.current_feed {
-            crate::rss::get_entries(&self.conn, feed.id)?
+            crate::rss::get_entries(&self.conn, &self.read_mode, feed.id)?
                 .into_iter()
                 .collect::<Vec<_>>()
                 .into()
@@ -116,6 +126,15 @@ impl<'app> App<'app> {
         };
 
         self.entries = entries;
+        if self.entry_selection_position < self.entries.items.len() {
+            self.entries
+                .state
+                .select(Some(self.entry_selection_position))
+        } else {
+            self.entries
+                .state
+                .select(Some(self.entries.items.len() - 1))
+        }
         Ok(())
     }
 
@@ -151,6 +170,7 @@ impl<'app> App<'app> {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
                     self.entries.previous();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
                     if let Some(entry) = self.get_selected_entry() {
                         let entry = entry?;
                         self.current_entry = Some(entry);
@@ -176,6 +196,7 @@ impl<'app> App<'app> {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
                     self.entries.next();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
                     if let Some(entry) = self.get_selected_entry() {
                         let entry = entry?;
                         self.current_entry = Some(entry);
@@ -195,8 +216,8 @@ impl<'app> App<'app> {
     pub fn on_right(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
-                self.selected = Selected::Entries;
                 if !self.entries.items.is_empty() {
+                    self.selected = Selected::Entries;
                     self.entries.state.select(Some(0));
                     if let Some(entry) = self.get_selected_entry() {
                         let entry = entry?;
@@ -212,12 +233,7 @@ impl<'app> App<'app> {
 
     pub fn on_left(&mut self) {
         match self.selected {
-            Selected::Feeds => {
-                self.selected = Selected::Entries;
-                if !self.entries.items.is_empty() {
-                    self.entries.state.select(Some(0))
-                }
-            }
+            Selected::Feeds => (),
             Selected::Entries => self.selected = Selected::Feeds,
             Selected::Entry(_) => {
                 self.scroll = 0;
@@ -290,6 +306,62 @@ impl<'app> App<'app> {
         Ok(())
     }
 
+    pub async fn toggle_read(&mut self) -> Result<(), Error> {
+        match &self.selected {
+            Selected::Entry(entry) => {
+                entry.toggle_read(&self.conn).await?;
+                self.update_current_entries()?;
+                if let Some(entry) = self.get_selected_entry() {
+                    let entry = entry?;
+                    self.current_entry = Some(entry);
+                }
+                self.selected = Selected::Entries;
+                self.scroll = 0;
+                // self.on_enter()?
+            }
+            Selected::Entries => {
+                if let Some(entry) = &self.current_entry {
+                    entry.toggle_read(&self.conn).await?;
+                    self.update_current_entries()?;
+                    if let Some(entry) = self.get_selected_entry() {
+                        let entry = entry?;
+                        self.current_entry = Some(entry);
+                    }
+                }
+            }
+            Selected::Feeds => (),
+        }
+
+        Ok(())
+    }
+
+    pub async fn toggle_read_mode(&mut self) -> Result<(), Error> {
+        match (&self.read_mode, &self.selected) {
+            (ReadMode::ShowAll, Selected::Feeds) | (ReadMode::ShowAll, Selected::Entries) => {
+                self.read_mode = ReadMode::ShowUnread
+            }
+            // => self.read_mode = ReadMode::ShowUnread,
+            (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
+                self.read_mode = ReadMode::ShowAll
+            }
+            _ => (),
+        }
+        self.update_current_entries()?;
+
+        if !self.entries.items.is_empty() {
+            self.entries.state.select(Some(0));
+        } else {
+            self.entries.state.select(None);
+        }
+
+        if let Some(entry) = self.get_selected_entry() {
+            let entry = entry?;
+            self.current_entry = Some(entry);
+        }
+
+        Ok(())
+    }
+
     pub async fn on_key(&mut self, c: char) -> Result<(), Error> {
         match c {
             'q' => {
@@ -301,7 +373,11 @@ impl<'app> App<'app> {
             'k' => self.on_up()?,
             'l' => self.on_right().unwrap(),
             // controls
-            'r' => return self.on_refresh().await,
+            'r' => match self.selected {
+                Selected::Feeds => return self.on_refresh().await,
+                _ => return self.toggle_read().await,
+            },
+            'a' => self.toggle_read_mode().await?,
             'e' | 'i' => {
                 self.mode = Mode::Editing;
             }

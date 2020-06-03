@@ -50,7 +50,7 @@ It stores all application data in a SQLite database file at a location of your c
 
 ## todo
 
-- [ ] mark entries as read
+- [x] mark entries as read
 - [x] atom support
 - [ ] error handling/display
 - [ ] debug view

@@ -61,9 +61,31 @@ pub struct Entry {
     pub description: Option<String>,
     pub content: Option<String>,
     pub link: Option<String>,
-    pub read_on: Option<chrono::DateTime<Utc>>,
+    pub read_at: Option<chrono::DateTime<Utc>>,
     pub inserted_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
+}
+
+impl Entry {
+    pub async fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+        if self.read_at.is_none() {
+            self.mark_entry_as_read(&conn)
+        } else {
+            self.mark_entry_as_unread(conn)
+        }
+    }
+
+    fn mark_entry_as_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+        let mut statement = conn.prepare("UPDATE entries SET read_at = ?2 WHERE id = ?1")?;
+        statement.execute(params![self.id, Utc::now()])?;
+        Ok(())
+    }
+
+    fn mark_entry_as_unread(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+        let mut statement = conn.prepare("UPDATE entries SET read_at = NULL WHERE id = ?1")?;
+        statement.execute(params![self.id])?;
+        Ok(())
+    }
 }
 
 struct InternalFeed {
@@ -114,7 +136,7 @@ impl FromStr for InternalFeed {
                 updated_at: Utc::now(),
                 entries: feed
                     .entries()
-                    .into_iter()
+                    .iter()
                     .map(|entry| entry.into())
                     .collect::<Vec<_>>(),
             }),
@@ -148,7 +170,7 @@ struct InternalEntry {
     pub description: Option<String>,
     pub content: Option<String>,
     pub link: Option<String>,
-    pub read_on: Option<chrono::DateTime<Utc>>,
+    pub read_at: Option<chrono::DateTime<Utc>>,
     pub inserted_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
 }
@@ -183,7 +205,7 @@ impl From<&atom::Entry> for InternalEntry {
             description: None,
             content: entry.content().and_then(|content| content.value.to_owned()),
             link: entry.links().get(0).map(|link| link.href().to_string()),
-            read_on: None,
+            read_at: None,
             inserted_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -201,7 +223,7 @@ impl From<&rss::Item> for InternalEntry {
                 .map(|description| description.to_owned()),
             content: entry.content().map(|content| content.to_owned()),
             link: entry.link().map(|link| link.to_owned()),
-            read_on: None,
+            read_at: None,
             inserted_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -298,7 +320,7 @@ pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
         description TEXT,
         content TEXT,
         link TEXT,
-        read_on TIMESTAMP,
+        read_at TIMESTAMP,
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
@@ -418,7 +440,7 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
           description, 
           content, 
           link, 
-          read_on, 
+          read_at, 
           inserted_at, 
           updated_at 
         FROM entries WHERE id=?1",
@@ -433,7 +455,7 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
                 description: row.get(5)?,
                 content: row.get(6)?,
                 link: row.get(7)?,
-                read_on: row.get(8)?,
+                read_at: row.get(8)?,
                 inserted_at: row.get(9)?,
                 updated_at: row.get(10)?,
             })
@@ -443,11 +465,20 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
     Ok(result)
 }
 
-pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<Entry>, Error> {
+pub fn get_entries(
+    conn: &rusqlite::Connection,
+    read_mode: &crate::app::ReadMode,
+    feed_id: FeedId,
+) -> Result<Vec<Entry>, Error> {
+    let read_at_predicate = if read_mode == &crate::app::ReadMode::ShowUnread {
+        "AND read_at IS NULL\n"
+    } else {
+        "AND read_at IS NOT NULL\n"
+    };
+
     // we get weird pubDate formats from feeds,
     // so sort by inserted at as this as a stable order at least
-    let mut statement = conn.prepare(
-        "SELECT 
+    let mut query = "SELECT 
         id, 
         feed_id, 
         title, 
@@ -456,13 +487,17 @@ pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<E
         description, 
         content, 
         link, 
-        read_on, 
+        read_at, 
         inserted_at, 
         updated_at 
         FROM entries 
-        WHERE feed_id=?1
-        ORDER BY inserted_at DESC",
-    )?;
+        WHERE feed_id=?1"
+        .to_string();
+
+    query.push_str(read_at_predicate);
+    query.push_str("ORDER BY inserted_at DESC");
+
+    let mut statement = conn.prepare(&query)?;
     let result = statement
         .query_map(params![feed_id], |row| {
             Ok(Entry {
@@ -474,7 +509,7 @@ pub fn get_entries(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Vec<E
                 description: row.get(5)?,
                 content: row.get(6)?,
                 link: row.get(7)?,
-                read_on: row.get(8)?,
+                read_at: row.get(8)?,
                 inserted_at: row.get(9)?,
                 updated_at: row.get(10)?,
             })

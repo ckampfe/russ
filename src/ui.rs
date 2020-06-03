@@ -123,6 +123,16 @@ where
         })
     }
 
+    if let Some(read_at) = &entry.read_at {
+        text.push({
+            let mut s = String::new();
+            s.push_str("Read at: ");
+            s.push_str(read_at.to_string().as_str());
+            s.push_str("\n");
+            Text::raw(s)
+        })
+    }
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title("Info")
