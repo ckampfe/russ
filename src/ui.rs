@@ -41,7 +41,7 @@ where
             [
                 Constraint::Percentage(60),
                 Constraint::Percentage(30),
-                Constraint::Percentage(3),
+                Constraint::Percentage(4),
                 Constraint::Percentage(5),
             ]
             .as_ref(),
@@ -282,10 +282,13 @@ where
     B: Backend,
 {
     let msg = match app.mode {
-        Mode::Normal => "Press q to exit, i to start editing.",
-        Mode::Editing => "Press Esc to stop editing, Enter to record the message",
+        Mode::Normal => "i - edit mode; q - exit",
+        Mode::Editing => "esc - normal mode; enter - fetch feed",
     };
-    let text = [Text::raw(msg)];
+    let text = [
+        Text::raw("r - mark entry read/un; a - toggle view read/un\n"),
+        Text::raw(msg),
+    ];
     let help_message = Paragraph::new(text.iter());
     f.render_widget(help_message, area);
 }
