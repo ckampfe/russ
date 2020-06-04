@@ -3,12 +3,13 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum Error {
-    NetworkError(reqwest::Error),
     AtomError(atom::Error),
-    RssError(rss::Error),
+    ChannelError(crossbeam_channel::RecvError),
     DatabaseError(rusqlite::Error),
     FeedKindError(String),
-    ChannelError(crossbeam_channel::RecvError),
+    FromSqlError(rusqlite::types::FromSqlError),
+    NetworkError(reqwest::Error),
+    RssError(rss::Error),
 }
 
 impl std::error::Error for Error {}
@@ -19,21 +20,15 @@ impl fmt::Display for Error {
     }
 }
 
-impl From<reqwest::Error> for Error {
-    fn from(error: reqwest::Error) -> Error {
-        Error::NetworkError(error)
-    }
-}
-
 impl From<atom::Error> for Error {
     fn from(error: atom::Error) -> Error {
         Error::AtomError(error)
     }
 }
 
-impl From<rss::Error> for Error {
-    fn from(error: rss::Error) -> Error {
-        Error::RssError(error)
+impl From<crossbeam_channel::RecvError> for Error {
+    fn from(error: crossbeam_channel::RecvError) -> Error {
+        Error::ChannelError(error)
     }
 }
 
@@ -43,8 +38,20 @@ impl From<rusqlite::Error> for Error {
     }
 }
 
-impl From<crossbeam_channel::RecvError> for Error {
-    fn from(error: crossbeam_channel::RecvError) -> Error {
-        Error::ChannelError(error)
+impl From<rusqlite::types::FromSqlError> for Error {
+    fn from(error: rusqlite::types::FromSqlError) -> Error {
+        Error::FromSqlError(error)
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(error: reqwest::Error) -> Error {
+        Error::NetworkError(error)
+    }
+}
+
+impl From<rss::Error> for Error {
+    fn from(error: rss::Error) -> Error {
+        Error::RssError(error)
     }
 }

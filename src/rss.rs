@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::modes::ReadMode;
 use atom_syndication as atom;
 use chrono::prelude::*;
 use rss::Channel;
@@ -7,12 +8,22 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 type EntryId = i64;
-type FeedId = i64;
+pub type FeedId = i64;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FeedKind {
     Atom,
     RSS,
+}
+
+impl rusqlite::types::FromSql for FeedKind {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        let s = value.as_str()?;
+        match FeedKind::from_str(s) {
+            Ok(feed_kind) => Ok(feed_kind),
+            Err(e) => Err(rusqlite::types::FromSqlError::Other(e.into())),
+        }
+    }
 }
 
 impl ToString for FeedKind {
@@ -176,23 +187,23 @@ struct InternalEntry {
 }
 
 impl InternalEntry {
-    pub fn link(&self) -> Option<String> {
-        self.link.clone()
+    pub fn link(&self) -> Option<&String> {
+        self.link.as_ref()
     }
-    pub fn title(&self) -> Option<String> {
-        self.title.clone()
+    pub fn title(&self) -> Option<&String> {
+        self.title.as_ref()
     }
-    pub fn author(&self) -> Option<String> {
-        self.author.clone()
+    pub fn author(&self) -> Option<&String> {
+        self.author.as_ref()
     }
-    pub fn pub_date(&self) -> Option<String> {
-        self.pub_date.clone()
+    pub fn pub_date(&self) -> Option<&String> {
+        self.pub_date.as_ref()
     }
-    pub fn description(&self) -> Option<String> {
-        self.description.clone()
+    pub fn description(&self) -> Option<&String> {
+        self.description.as_ref()
     }
-    pub fn content(&self) -> Option<String> {
-        self.content.clone()
+    pub fn content(&self) -> Option<&String> {
+        self.content.as_ref()
     }
 }
 
@@ -229,10 +240,7 @@ impl From<&rss::Item> for InternalEntry {
         }
     }
 }
-pub(crate) async fn subscribe_to_feed(
-    conn: &rusqlite::Connection,
-    url: &str,
-) -> Result<FeedId, Error> {
+pub async fn subscribe_to_feed(conn: &rusqlite::Connection, url: &str) -> Result<FeedId, Error> {
     let feed: InternalFeed = fetch_feed(url).await?;
     let feed_id = create_feed(conn, &feed)?;
     // N+1!!!! YEAH BABY
@@ -264,28 +272,28 @@ pub async fn refresh_feed(
     let remote_items_links = remote_items
         .iter()
         .flat_map(|item| item.link())
+        .cloned()
         .collect::<HashSet<String>>();
-    let local_entries_links = get_entries_links(conn, feed_id)?;
+    // let local_entries_links = get_entries_links(conn, feed_id)?;
+    let local_entries_links = get_entries(conn, &ReadMode::All, feed_id)?
+        .into_iter()
+        .flat_map(|entry| entry.link)
+        .collect::<HashSet<_>>();
 
     let difference = remote_items_links
-        .difference(
-            &local_entries_links
-                .into_iter()
-                .map(|i| i)
-                .collect::<HashSet<_>>(),
-        )
+        .difference(&local_entries_links)
         .cloned()
         .collect::<HashSet<_>>();
 
     let mut inserted_item_ids = vec![];
 
-    let items_to_add = remote_items.iter().filter(|item| match item.link() {
+    let items_to_add = remote_items.into_iter().filter(|item| match item.link() {
         Some(link) => difference.contains(link.as_str()),
         None => false,
     });
 
     for item in items_to_add {
-        let item_id = add_entry_to_feed(conn, feed_id, item)?;
+        let item_id = add_entry_to_feed(conn, feed_id, &item)?;
         inserted_item_ids.push(item_id);
     }
 
@@ -294,8 +302,7 @@ pub async fn refresh_feed(
     Ok(inserted_item_ids)
 }
 
-// db functions
-pub(crate) fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
+pub fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -419,12 +426,34 @@ fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String, 
     Ok(s)
 }
 
-pub(crate) fn get_feed_titles(conn: &rusqlite::Connection) -> Result<Vec<(FeedId, String)>, Error> {
-    let mut statement = conn.prepare("SELECT id, title FROM feeds ORDER BY title ASC")?;
+pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>, Error> {
+    let mut statement = conn.prepare(
+        "SELECT 
+          id, 
+          title, 
+          feed_link, 
+          link, 
+          feed_kind, 
+          refreshed_at, 
+          inserted_at, 
+          updated_at 
+        FROM feeds ORDER BY title ASC",
+    )?;
     let result = statement
-        .query_map(NO_PARAMS, |row| Ok((row.get(0)?, row.get(1)?)))?
+        .query_map(NO_PARAMS, |row| {
+            Ok(Feed {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                feed_link: row.get(2)?,
+                link: row.get(3)?,
+                feed_kind: row.get(4)?,
+                refreshed_at: row.get(5)?,
+                inserted_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?
         .map(|s| s.unwrap())
-        .collect::<Vec<(FeedId, String)>>();
+        .collect::<Vec<Feed>>();
 
     Ok(result)
 }
@@ -467,13 +496,13 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
 
 pub fn get_entries(
     conn: &rusqlite::Connection,
-    read_mode: &crate::app::ReadMode,
+    read_mode: &ReadMode,
     feed_id: FeedId,
 ) -> Result<Vec<Entry>, Error> {
-    let read_at_predicate = if read_mode == &crate::app::ReadMode::ShowUnread {
-        "AND read_at IS NULL\n"
-    } else {
-        "AND read_at IS NOT NULL\n"
+    let read_at_predicate = match read_mode {
+        ReadMode::ShowUnread => "\nAND read_at IS NULL",
+        ReadMode::ShowRead => "\nAND read_at IS NOT NULL",
+        ReadMode::All => "\n",
     };
 
     // we get weird pubDate formats from feeds,
@@ -495,7 +524,7 @@ pub fn get_entries(
         .to_string();
 
     query.push_str(read_at_predicate);
-    query.push_str("ORDER BY inserted_at DESC");
+    query.push_str("\nORDER BY inserted_at DESC");
 
     let mut statement = conn.prepare(&query)?;
     let result = statement
@@ -516,20 +545,6 @@ pub fn get_entries(
         })?
         .map(|entry| entry.unwrap())
         .collect::<Vec<_>>();
-
-    Ok(result)
-}
-
-fn get_entries_links(
-    conn: &rusqlite::Connection,
-    feed_id: FeedId,
-) -> Result<HashSet<String>, Error> {
-    let mut statement =
-        conn.prepare("SELECT link FROM entries WHERE feed_id=?1 ORDER BY pub_date DESC")?;
-    let result = statement
-        .query_map(params![feed_id], |row| row.get(0))?
-        .map(|s| s.unwrap())
-        .collect::<HashSet<String>>();
 
     Ok(result)
 }

@@ -6,10 +6,11 @@ use tui::{
     Frame,
 };
 
-use crate::app::{App, Mode, Selected};
+use crate::app::App;
+use crate::modes::{Mode, Selected};
 use crate::rss::Entry;
 
-pub(crate) fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .direction(Direction::Horizontal)
@@ -27,7 +28,13 @@ pub(crate) fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         Selected::Entry(entry) => {
             let default_title = String::from("Entry");
             let title = entry.title.as_ref().unwrap_or_else(|| &default_title);
-            draw_entry(f, chunks[1], app.scroll, &app.current_entry_text, title);
+            draw_entry(
+                f,
+                chunks[1],
+                app.entry_scroll_position,
+                &app.current_entry_text,
+                title,
+            );
         }
     }
 }
@@ -148,10 +155,11 @@ where
     B: Backend,
 {
     let feeds = app
-        .feed_titles
+        .feeds
         .items
         .iter()
-        .map(|(_feed_id, title)| Text::raw(title));
+        .flat_map(|feed| feed.title.as_ref())
+        .map(Text::raw);
     let feeds = List::new(feeds).block(
         Block::default()
             .borders(Borders::ALL)
@@ -171,7 +179,7 @@ where
         feeds
     };
 
-    f.render_stateful_widget(feeds, area, &mut app.feed_titles.state);
+    f.render_stateful_widget(feeds, area, &mut app.feeds.state);
 }
 
 fn draw_feed_info<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
@@ -297,7 +305,7 @@ fn draw_new_feed_input<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
-    let text = [Text::raw(&app.input)];
+    let text = [Text::raw(&app.feed_subscription_input)];
     let input = Paragraph::new(text.iter())
         .style(Style::default().fg(Color::Yellow))
         .block(
@@ -353,7 +361,6 @@ fn draw_entry<B>(
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
-        // .title("Entry")
         .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
     let paragraph = Paragraph::new(text.iter())
         .block(block)

@@ -1,55 +1,34 @@
 use crate::error::Error;
+use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
-use std::path::PathBuf;
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Selected {
-    Feeds,
-    Entries,
-    Entry(crate::rss::Entry),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Mode {
-    Editing,
-    Normal,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ReadMode {
-    ShowAll,
-    ShowUnread,
-}
 
 #[derive(Debug)]
-pub(crate) struct App<'app> {
-    pub title: &'app str,
-    pub database_path: PathBuf,
+pub struct App<'app> {
+    // database stuff
     pub conn: rusqlite::Connection,
-    pub enhanced_graphics: bool,
-    pub should_quit: bool,
-    pub progress: f64,
-    pub error_flash: Option<Error>,
-    pub feed_titles: util::StatefulList<(i64, String)>,
-    pub entries: util::StatefulList<crate::rss::Entry>,
-    pub selected: Selected,
-    pub scroll: u16,
-    pub current_entry: Option<crate::rss::Entry>,
-    pub current_entry_text: Vec<tui::widgets::Text<'app>>,
+    // feed stuff
     pub current_feed: Option<crate::rss::Feed>,
-    pub input: String,
+    pub feeds: util::StatefulList<crate::rss::Feed>,
+    // entry stuff
+    pub current_entry: Option<crate::rss::Entry>,
+    pub entries: util::StatefulList<crate::rss::Entry>,
+    pub line_length: usize,
+    pub entry_selection_position: usize,
+    pub current_entry_text: Vec<tui::widgets::Text<'app>>,
+    pub entry_scroll_position: u16,
+    // modes
+    pub should_quit: bool,
+    pub selected: Selected,
     pub mode: Mode,
     pub read_mode: ReadMode,
-    pub entry_selection_position: usize,
+    // misc
+    pub error_flash: Option<Error>,
+    pub feed_subscription_input: String,
 }
 
 impl<'app> App<'app> {
-    pub(crate) fn new(
-        title: &'app str,
-        database_path: PathBuf,
-        enhanced_graphics: bool,
-    ) -> Result<App<'app>, Error> {
-        let conn = rusqlite::Connection::open(&database_path)?;
+    pub fn new(options: crate::Options) -> Result<App<'app>, Error> {
+        let conn = rusqlite::Connection::open(&options.database_path)?;
         crate::rss::initialize_db(&conn)?;
         let initial_feed_titles = vec![].into();
         let selected = Selected::Feeds;
@@ -57,35 +36,32 @@ impl<'app> App<'app> {
         let initial_entries = vec![].into();
 
         let mut app = App {
-            title,
-            database_path,
             conn,
-            enhanced_graphics,
-            progress: 0.0,
+            line_length: options.line_length,
             should_quit: false,
             error_flash: None,
-            feed_titles: initial_feed_titles,
+            feeds: initial_feed_titles,
             entries: initial_entries,
             selected,
-            scroll: 0,
+            entry_scroll_position: 0,
             current_entry: None,
             current_entry_text: vec![],
             current_feed: initial_current_feed,
-            input: String::new(),
+            feed_subscription_input: String::new(),
             mode: Mode::Normal,
             read_mode: ReadMode::ShowUnread,
             entry_selection_position: 0,
         };
 
-        app.update_feed_titles()?;
+        app.update_feeds()?;
         app.update_current_feed_and_entries()?;
 
         Ok(app)
     }
 
-    pub fn update_feed_titles(&mut self) -> Result<(), Error> {
-        let feed_titles = crate::rss::get_feed_titles(&self.conn)?.into();
-        self.feed_titles = feed_titles;
+    pub fn update_feeds(&mut self) -> Result<(), Error> {
+        let feeds = crate::rss::get_feeds(&self.conn)?.into();
+        self.feeds = feeds;
         Ok(())
     }
 
@@ -96,17 +72,17 @@ impl<'app> App<'app> {
     }
 
     fn update_current_feed(&mut self) -> Result<(), Error> {
-        let current_feed = if self.feed_titles.items.is_empty() {
+        let current_feed = if self.feeds.items.is_empty() {
             None
         } else {
-            let selected_idx = match self.feed_titles.state.selected() {
+            let selected_idx = match self.feeds.state.selected() {
                 Some(idx) => idx,
                 None => {
-                    self.feed_titles.state.select(Some(0));
+                    self.feeds.state.select(Some(0));
                     0
                 }
             };
-            let feed_id = self.feed_titles.items[selected_idx].0;
+            let feed_id = self.feeds.items[selected_idx].id;
             Some(crate::rss::get_feed(&self.conn, feed_id)?)
         };
 
@@ -143,9 +119,10 @@ impl<'app> App<'app> {
     }
 
     pub async fn subscribe_to_feed(&mut self) -> Result<(), Error> {
-        let _feed_id = crate::rss::subscribe_to_feed(&self.conn, &self.input).await?;
-        let feed_titles = crate::rss::get_feed_titles(&self.conn)?.into();
-        self.feed_titles = feed_titles;
+        let _feed_id =
+            crate::rss::subscribe_to_feed(&self.conn, &self.feed_subscription_input).await?;
+        let feeds = crate::rss::get_feeds(&self.conn)?.into();
+        self.feeds = feeds;
         Ok(())
     }
 
@@ -164,7 +141,7 @@ impl<'app> App<'app> {
     pub fn on_up(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
-                self.feed_titles.previous();
+                self.feeds.previous();
                 self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
@@ -178,8 +155,8 @@ impl<'app> App<'app> {
                 }
             }
             Selected::Entry(_) => {
-                if let Some(n) = self.scroll.checked_sub(1) {
-                    self.scroll = n
+                if let Some(n) = self.entry_scroll_position.checked_sub(1) {
+                    self.entry_scroll_position = n
                 };
             }
         }
@@ -190,7 +167,7 @@ impl<'app> App<'app> {
     pub fn on_down(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
-                self.feed_titles.next();
+                self.feeds.next();
                 self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
@@ -204,8 +181,8 @@ impl<'app> App<'app> {
                 }
             }
             Selected::Entry(_) => {
-                if let Some(n) = self.scroll.checked_add(1) {
-                    self.scroll = n
+                if let Some(n) = self.entry_scroll_position.checked_add(1) {
+                    self.entry_scroll_position = n
                 };
             }
         }
@@ -236,7 +213,7 @@ impl<'app> App<'app> {
             Selected::Feeds => (),
             Selected::Entries => self.selected = Selected::Feeds,
             Selected::Entry(_) => {
-                self.scroll = 0;
+                self.entry_scroll_position = 0;
                 self.selected = {
                     self.current_entry_text = vec![];
                     Selected::Entries
@@ -258,29 +235,32 @@ impl<'app> App<'app> {
                         // if no description tag,
                         // use empty string.
                         // TODO figure out what to actually do if there are neither
-                        let entry_text = &entry
+                        let entry_html = &entry
                             .content
                             .as_ref()
                             .or_else(|| entry.description.as_ref())
                             .or_else(|| Some(&empty_string));
 
-                        // TODO make this width configurable
-                        // TODO config should be in the database!
-                        let text = html2text::from_read(entry_text.clone().unwrap().as_bytes(), 90);
+                        if let Some(html) = entry_html {
+                            let text = html2text::from_read(html.as_bytes(), self.line_length);
 
-                        let text = text
-                            .split('\n')
-                            .map(|line| {
-                                tui::widgets::Text::raw({
-                                    let mut owned = line.to_owned();
-                                    owned.push_str("\n");
-                                    owned
+                            let text = text
+                                .split('\n')
+                                .map(|line| {
+                                    tui::widgets::Text::raw({
+                                        let mut owned = line.to_owned();
+                                        owned.push_str("\n");
+                                        owned
+                                    })
                                 })
-                            })
-                            .collect::<Vec<_>>();
+                                .collect::<Vec<_>>();
+
+                            self.current_entry_text = text;
+                        } else {
+                            self.current_entry_text = vec![];
+                        }
 
                         self.selected = Selected::Entry(entry.clone());
-                        self.current_entry_text = text;
                     }
                 }
 
@@ -299,8 +279,8 @@ impl<'app> App<'app> {
     }
 
     pub async fn on_refresh(&mut self) -> Result<(), Error> {
-        let selected_idx = self.feed_titles.state.selected().unwrap();
-        let feed_id = self.feed_titles.items[selected_idx].0;
+        let selected_idx = self.feeds.state.selected().unwrap();
+        let feed_id = self.feeds.items[selected_idx].id;
         let _ = crate::rss::refresh_feed(&self.conn, feed_id).await?;
         self.update_current_feed_and_entries()?;
         Ok(())
@@ -316,8 +296,7 @@ impl<'app> App<'app> {
                     self.current_entry = Some(entry);
                 }
                 self.selected = Selected::Entries;
-                self.scroll = 0;
-                // self.on_enter()?
+                self.entry_scroll_position = 0;
             }
             Selected::Entries => {
                 if let Some(entry) = &self.current_entry {
@@ -337,12 +316,11 @@ impl<'app> App<'app> {
 
     pub async fn toggle_read_mode(&mut self) -> Result<(), Error> {
         match (&self.read_mode, &self.selected) {
-            (ReadMode::ShowAll, Selected::Feeds) | (ReadMode::ShowAll, Selected::Entries) => {
+            (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
                 self.read_mode = ReadMode::ShowUnread
             }
-            // => self.read_mode = ReadMode::ShowUnread,
             (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
-                self.read_mode = ReadMode::ShowAll
+                self.read_mode = ReadMode::ShowRead
             }
             _ => (),
         }
@@ -385,13 +363,5 @@ impl<'app> App<'app> {
         }
 
         Ok(())
-    }
-
-    pub fn on_tick(&mut self) {
-        // Update progress
-        self.progress += 0.001;
-        if self.progress > 1.0 {
-            self.progress = 0.0;
-        }
     }
 }

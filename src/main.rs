@@ -1,4 +1,5 @@
-use app::{App, Mode};
+use crate::modes::*;
+use app::App;
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     execute,
@@ -16,6 +17,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
 mod error;
+mod modes;
 mod rss;
 mod ui;
 mod util;
@@ -26,17 +28,16 @@ enum Event<I> {
 }
 
 #[derive(Debug, StructOpt)]
-struct Options {
+pub struct Options {
     /// feed database path
     #[structopt(short, long)]
     database_path: PathBuf,
     /// time in ms between two ticks.
     #[structopt(short, long, default_value = "250")]
     tick_rate: u64,
-    /// whether unicode symbols are used to improve the overall look of the app
-    /// defaults to true
-    #[structopt(short, long)]
-    enhanced_graphics: Option<bool>,
+    /// display line length for entries
+    #[structopt(short, long, default_value = "90")]
+    line_length: usize,
 }
 
 #[tokio::main]
@@ -73,11 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    let mut app = App::new(
-        "Russ",
-        options.database_path,
-        options.enhanced_graphics.unwrap_or_else(|| true),
-    )?;
+    let mut app = App::new(options)?;
 
     terminal.clear()?;
 
@@ -102,9 +99,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         KeyCode::Esc => app.on_esc(),
                         _ => {}
                     },
-                    Event::Tick => {
-                        app.on_tick();
-                    }
+                    Event::Tick => (),
                 }
                 if app.should_quit {
                     break;
@@ -115,24 +110,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Event::Input(event) => match event.code {
                         KeyCode::Enter => {
                             app.subscribe_to_feed().await?;
-                            app.input = String::new();
+                            app.feed_subscription_input = String::new();
                             app.select_feeds().await;
                             app.update_current_feed_and_entries()?;
                         }
                         KeyCode::Char(c) => {
-                            app.input.push(c);
+                            app.feed_subscription_input.push(c);
                         }
                         KeyCode::Backspace => {
-                            app.input.pop();
+                            app.feed_subscription_input.pop();
                         }
                         KeyCode::Esc => {
                             app.mode = Mode::Normal;
                         }
                         _ => {}
                     },
-                    Event::Tick => {
-                        app.on_tick();
-                    }
+                    Event::Tick => (),
                 }
                 if app.should_quit {
                     break;
