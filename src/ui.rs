@@ -353,7 +353,7 @@ where
             .split(area);
         {
             let error_text = format!("{:?}", error)
-                .split("\n")
+                .split('\n')
                 .map(|line| {
                     let mut s = String::with_capacity(line.len() + 1);
                     s.push_str(line);
@@ -407,7 +407,7 @@ fn draw_entry<B>(
             .split(area);
         {
             let error_text = format!("{:?}", error)
-                .split("\n")
+                .split('\n')
                 .map(|line| {
                     let mut s = String::with_capacity(line.len() + 1);
                     s.push_str(line);

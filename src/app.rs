@@ -345,33 +345,39 @@ impl<'app> App<'app> {
         match c {
             // vim-style movement
             'h' => self.on_left(),
-            'j' => match self.on_down() {
-                Err(e) => self.error_flash = Some(e),
-                _ => (),
-            },
-            'k' => match self.on_up() {
-                Err(e) => self.error_flash = Some(e),
-                _ => (),
-            },
-            'l' => match self.on_right() {
-                Err(e) => self.error_flash = Some(e),
-                _ => (),
-            },
+            'j' => {
+                if let Err(e) = self.on_down() {
+                    self.error_flash = Some(e)
+                }
+            }
+            'k' => {
+                if let Err(e) = self.on_up() {
+                    self.error_flash = Some(e)
+                }
+            }
+            'l' => {
+                if let Err(e) = self.on_right() {
+                    self.error_flash = Some(e)
+                }
+            }
             // controls
             'r' => match self.selected {
-                Selected::Feeds => match self.on_refresh().await {
-                    Err(e) => self.error_flash = Some(e),
-                    _ => (),
-                },
-                _ => match self.toggle_read().await {
-                    Err(e) => self.error_flash = Some(e),
-                    _ => (),
-                },
+                Selected::Feeds => {
+                    if let Err(e) = self.on_refresh().await {
+                        self.error_flash = Some(e)
+                    }
+                }
+                _ => {
+                    if let Err(e) = self.toggle_read().await {
+                        self.error_flash = Some(e)
+                    }
+                }
             },
-            'a' => match self.toggle_read_mode().await {
-                Err(e) => self.error_flash = Some(e),
-                _ => (),
-            },
+            'a' => {
+                if let Err(e) = self.toggle_read_mode().await {
+                    self.error_flash = Some(e)
+                }
+            }
             'e' | 'i' => {
                 self.mode = Mode::Editing;
             }
