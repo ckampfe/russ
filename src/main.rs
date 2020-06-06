@@ -85,12 +85,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 match rx.recv()? {
                     Event::Input(event) => match event.code {
                         KeyCode::Char('q') => {
-                            disable_raw_mode()?;
-                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                            terminal.show_cursor()?;
-                            break;
+                            if app.error_flash.is_some() {
+                                app.error_flash = None;
+                            } else {
+                                disable_raw_mode()?;
+                                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                                terminal.show_cursor()?;
+                                break;
+                            }
                         }
-                        KeyCode::Char(c) => app.on_key(c).await?,
+                        KeyCode::Char(c) => app.on_key(c).await,
                         KeyCode::Left => app.on_left(),
                         KeyCode::Up => app.on_up()?,
                         KeyCode::Right => app.on_right()?,

@@ -107,9 +107,10 @@ impl<'app> App<'app> {
                 .state
                 .select(Some(self.entry_selection_position))
         } else {
-            self.entries
-                .state
-                .select(Some(self.entries.items.len() - 1))
+            match self.entries.items.len().checked_sub(1) {
+                Some(n) => self.entries.state.select(Some(n)),
+                None => self.entries.state.select(Some(0)),
+            }
         }
         Ok(())
     }
@@ -340,28 +341,41 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub async fn on_key(&mut self, c: char) -> Result<(), Error> {
+    pub async fn on_key(&mut self, c: char) {
         match c {
-            'q' => {
-                self.should_quit = true;
-            }
             // vim-style movement
             'h' => self.on_left(),
-            'j' => self.on_down()?,
-            'k' => self.on_up()?,
-            'l' => self.on_right().unwrap(),
+            'j' => match self.on_down() {
+                Err(e) => self.error_flash = Some(e),
+                _ => (),
+            },
+            'k' => match self.on_up() {
+                Err(e) => self.error_flash = Some(e),
+                _ => (),
+            },
+            'l' => match self.on_right() {
+                Err(e) => self.error_flash = Some(e),
+                _ => (),
+            },
             // controls
             'r' => match self.selected {
-                Selected::Feeds => return self.on_refresh().await,
-                _ => return self.toggle_read().await,
+                Selected::Feeds => match self.on_refresh().await {
+                    Err(e) => self.error_flash = Some(e),
+                    _ => (),
+                },
+                _ => match self.toggle_read().await {
+                    Err(e) => self.error_flash = Some(e),
+                    _ => (),
+                },
             },
-            'a' => self.toggle_read_mode().await?,
+            'a' => match self.toggle_read_mode().await {
+                Err(e) => self.error_flash = Some(e),
+                _ => (),
+            },
             'e' | 'i' => {
                 self.mode = Mode::Editing;
             }
             _ => (),
         }
-
-        Ok(())
     }
 }

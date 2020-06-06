@@ -34,6 +34,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 app.entry_scroll_position,
                 &app.current_entry_text,
                 title,
+                &app.error_flash,
             );
         }
     }
@@ -345,7 +346,38 @@ where
         entries_titles
     };
 
-    f.render_stateful_widget(entries_titles, area, &mut app.entries.state);
+    if let Some(error) = &app.error_flash {
+        let chunks = Layout::default()
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
+            .direction(Direction::Vertical)
+            .split(area);
+        {
+            let error_text = format!("{:?}", error)
+                .split("\n")
+                .map(|line| {
+                    let mut s = String::with_capacity(line.len() + 1);
+                    s.push_str(line);
+                    s.push_str("\n");
+                    Text::raw(s)
+                })
+                .collect::<Vec<_>>();
+
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Error - press 'q' to close")
+                .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+
+            let error_widget = Paragraph::new(error_text.iter())
+                .block(block)
+                .wrap(true)
+                .scroll(0);
+
+            f.render_stateful_widget(entries_titles, chunks[0], &mut app.entries.state);
+            f.render_widget(error_widget, chunks[1]);
+        }
+    } else {
+        f.render_stateful_widget(entries_titles, area, &mut app.entries.state);
+    }
 }
 
 fn draw_entry<B>(
@@ -354,6 +386,7 @@ fn draw_entry<B>(
     scroll: u16,
     current_entry_text: &[Text],
     title: &str,
+    error_flash: &Option<crate::error::Error>,
 ) where
     B: Backend,
 {
@@ -366,5 +399,37 @@ fn draw_entry<B>(
         .block(block)
         .wrap(true)
         .scroll(scroll);
-    f.render_widget(paragraph, area);
+
+    if let Some(error) = error_flash {
+        let chunks = Layout::default()
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
+            .direction(Direction::Vertical)
+            .split(area);
+        {
+            let error_text = format!("{:?}", error)
+                .split("\n")
+                .map(|line| {
+                    let mut s = String::with_capacity(line.len() + 1);
+                    s.push_str(line);
+                    s.push_str("\n");
+                    Text::raw(s)
+                })
+                .collect::<Vec<_>>();
+
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Error - press 'q' to close")
+                .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+
+            let error_widget = Paragraph::new(error_text.iter())
+                .block(block)
+                .wrap(true)
+                .scroll(0);
+
+            f.render_widget(paragraph, chunks[0]);
+            f.render_widget(error_widget, chunks[1]);
+        }
+    } else {
+        f.render_widget(paragraph, area);
+    }
 }

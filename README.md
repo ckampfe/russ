@@ -52,7 +52,7 @@ It stores all application data in a SQLite database file at a location of your c
 
 - [x] mark entries as read
 - [x] atom support
-- [ ] error handling/display
+- [x] error handling/display
 - [ ] debug view
 - [ ] config (in db)
 - [ ] deleting feeds
