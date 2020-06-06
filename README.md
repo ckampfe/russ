@@ -50,20 +50,22 @@ It stores all application data in a SQLite database file at a location of your c
 
 ## todo
 
-- [x] mark entries as read
-- [x] atom support
-- [x] error handling/display
-- [ ] debug view
-- [ ] config (in db)
-- [ ] deleting feeds
-- [ ] better feed refreshing functionality
-- [ ] some kind of search
-- [x] configurable word wrapping line length
-- [x] display info about an individual entry
 - [x] rss support
-- [x] adding feeds in-app
+- [x] atom support
 - [x] vim-style hjkl navigation
-- [x] primitive feed refreshing functionality
-- [x] html -> text conversion
+- [x] subscribe to a feed
+- [x] refresh a feed
+- [x] mark entries as read
+- [x] mark entries as unread
+- [x] view only unread entries
+- [x] view only read entries
 - [x] entry reading/scrolling
-- [x] display info about the feed
+- [x] error handling/display
+- [x] display entry info
+- [x] display feed info
+- [x] configurable word wrapping line length
+- [ ] nonblocking IO
+- [ ] debug view (show app state)
+- [ ] deleting feeds
+- [ ] refresh all feeds
+- [ ] some kind of search
