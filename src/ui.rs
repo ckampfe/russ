@@ -406,6 +406,8 @@ fn draw_entry<B>(
             .direction(Direction::Vertical)
             .split(area);
         {
+            // see https://github.com/dtolnay/indoc/blob/902c3eba53a7c1206ee43262768e6dff6f882f29/unindent/src/lib.rs#L123-L130
+            // for a function that can count leading spaces.
             let error_text = format!("{:?}", error)
                 .split('\n')
                 .map(|line| {
