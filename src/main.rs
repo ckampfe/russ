@@ -32,10 +32,10 @@ pub struct Options {
     /// feed database path
     #[structopt(short, long)]
     database_path: PathBuf,
-    /// time in ms between two ticks.
+    /// time in ms between two ticks
     #[structopt(short, long, default_value = "250")]
     tick_rate: u64,
-    /// display line length for entries
+    /// maximum line length for entries
     #[structopt(short, long, default_value = "90")]
     line_length: usize,
 }
