@@ -11,6 +11,7 @@ At this time I cannot guarantee any kind of stability in either the software its
 
 ```
 $ git clone
+$ cd russ
 $ cargo install --path .
 $ russ -d"your_db_name.db"
 ```
@@ -18,6 +19,7 @@ $ russ -d"your_db_name.db"
 ```
 $ russ -h
 russ 0.1.0
+
 USAGE:
     russ [OPTIONS] --database-path <database-path>
 
@@ -26,11 +28,9 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -d, --database-path <database-path>            feed database path
-    -e, --enhanced-graphics <enhanced-graphics>
-            whether unicode symbols are used to improve the overall look of the app defaults to true
-
-    -t, --tick-rate <tick-rate>                    time in ms between two ticks [default: 250]
+    -d, --database-path <database-path>    feed database path
+    -l, --line-length <line-length>        maximum line length for entries [default: 90]
+    -t, --tick-rate <tick-rate>            time in ms between two ticks [default: 250]
 ```
 
 ## goals
@@ -64,6 +64,8 @@ It stores all application data in a SQLite database file at a location of your c
 - [x] display entry info
 - [x] display feed info
 - [x] configurable word wrapping line length
+- [ ] stabilize the database schema
+- [ ] migration process for database changes
 - [ ] nonblocking IO
 - [ ] debug view (show app state)
 - [ ] deleting feeds
