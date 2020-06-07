@@ -20,4 +20,5 @@ tokio = { version = "0.2.21", features = ["full"] }
 tui = { version = "0.9.5", default-features = false, features = ['crossterm'] }
 
 [profile.release]
+codegen-units = 1
 lto = true
