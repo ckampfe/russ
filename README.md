@@ -35,12 +35,24 @@ OPTIONS:
 
 ## goals
 
-1. A usable RSS client in the terminal, not in a webpage
-1. Set up how I like it (vim-style navigation, columnar layout with higher-level info on the left, content on the right)
-1. Fully offline operation
+1. An RSS client in the terminal, not in a webpage
+1. Controls how I like them (vim-style navigation)
+1. Layout how I like it (columnar layout with higher-level info on the left, content on the right)
+1. Fully offline operation - network used only for resyncing feeds
 1. All application data in SQLite
-1. Minimal configuration/options
+1. Fast - all interactions should take place in under 100ms
+1. As few configuration/options as possible
 1. As little resource usage as possible
+1. As few system dependencies as possible - Rust and `sqlite3`
+
+## nongoals
+
+1. Separate client/server processes
+1. Browser interaction/support
+1. Analysis/metrics - use SQLite itself
+1. Sharing/social/posting to Twitter/etc
+1. Emacs integration
+1. Mobile support
 
 ## design
 
@@ -64,9 +76,11 @@ It stores all application data in a SQLite database file at a location of your c
 - [x] display entry info
 - [x] display feed info
 - [x] configurable word wrapping line length
+- [ ] profiling mode that shows speed of UI interaction
 - [ ] stabilize the database schema
 - [ ] migration process for database changes
 - [ ] nonblocking IO
+- [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
 - [ ] deleting feeds
 - [ ] refresh all feeds
