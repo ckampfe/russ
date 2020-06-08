@@ -127,7 +127,7 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry, Error>> {
+    async fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry, Error>> {
         if let Some(selected_idx) = self.entries.state.selected() {
             if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
                 Some(crate::rss::get_entry(&self.conn, entry_id))
@@ -139,7 +139,7 @@ impl<'app> App<'app> {
         }
     }
 
-    pub fn on_up(&mut self) -> Result<(), Error> {
+    pub async fn on_up(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
                 self.feeds.previous();
@@ -149,7 +149,7 @@ impl<'app> App<'app> {
                 if !self.entries.items.is_empty() {
                     self.entries.previous();
                     self.entry_selection_position = self.entries.state.selected().unwrap();
-                    if let Some(entry) = self.get_selected_entry() {
+                    if let Some(entry) = self.get_selected_entry().await {
                         let entry = entry?;
                         self.current_entry = Some(entry);
                     }
@@ -165,7 +165,7 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub fn on_down(&mut self) -> Result<(), Error> {
+    pub async fn on_down(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
                 self.feeds.next();
@@ -175,7 +175,7 @@ impl<'app> App<'app> {
                 if !self.entries.items.is_empty() {
                     self.entries.next();
                     self.entry_selection_position = self.entries.state.selected().unwrap();
-                    if let Some(entry) = self.get_selected_entry() {
+                    if let Some(entry) = self.get_selected_entry().await {
                         let entry = entry?;
                         self.current_entry = Some(entry);
                     }
@@ -191,25 +191,25 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub fn on_right(&mut self) -> Result<(), Error> {
+    pub async fn on_right(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => {
                 if !self.entries.items.is_empty() {
                     self.selected = Selected::Entries;
                     self.entries.state.select(Some(0));
-                    if let Some(entry) = self.get_selected_entry() {
+                    if let Some(entry) = self.get_selected_entry().await {
                         let entry = entry?;
                         self.current_entry = Some(entry);
                     }
                 }
                 Ok(())
             }
-            Selected::Entries => self.on_enter(),
+            Selected::Entries => self.on_enter().await,
             Selected::Entry(_) => Ok(()),
         }
     }
 
-    pub fn on_left(&mut self) {
+    pub async fn on_left(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => (),
             Selected::Entries => self.selected = Selected::Feeds,
@@ -221,9 +221,11 @@ impl<'app> App<'app> {
                 }
             }
         }
+
+        Ok(())
     }
 
-    pub fn on_enter(&mut self) -> Result<(), Error> {
+    pub async fn on_enter(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
@@ -292,7 +294,7 @@ impl<'app> App<'app> {
             Selected::Entry(entry) => {
                 entry.toggle_read(&self.conn).await?;
                 self.update_current_entries()?;
-                if let Some(entry) = self.get_selected_entry() {
+                if let Some(entry) = self.get_selected_entry().await {
                     let entry = entry?;
                     self.current_entry = Some(entry);
                 }
@@ -303,7 +305,7 @@ impl<'app> App<'app> {
                 if let Some(entry) = &self.current_entry {
                     entry.toggle_read(&self.conn).await?;
                     self.update_current_entries()?;
-                    if let Some(entry) = self.get_selected_entry() {
+                    if let Some(entry) = self.get_selected_entry().await {
                         let entry = entry?;
                         self.current_entry = Some(entry);
                     }
@@ -333,7 +335,7 @@ impl<'app> App<'app> {
             self.entries.state.select(None);
         }
 
-        if let Some(entry) = self.get_selected_entry() {
+        if let Some(entry) = self.get_selected_entry().await {
             let entry = entry?;
             self.current_entry = Some(entry);
         }
@@ -344,19 +346,23 @@ impl<'app> App<'app> {
     pub async fn on_key(&mut self, c: char) {
         match c {
             // vim-style movement
-            'h' => self.on_left(),
+            'h' => {
+                if let Err(e) = self.on_left().await {
+                    self.error_flash = Some(e)
+                }
+            }
             'j' => {
-                if let Err(e) = self.on_down() {
+                if let Err(e) = self.on_down().await {
                     self.error_flash = Some(e)
                 }
             }
             'k' => {
-                if let Err(e) = self.on_up() {
+                if let Err(e) = self.on_up().await {
                     self.error_flash = Some(e)
                 }
             }
             'l' => {
-                if let Err(e) = self.on_right() {
+                if let Err(e) = self.on_right().await {
                     self.error_flash = Some(e)
                 }
             }

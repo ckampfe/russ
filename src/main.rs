@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::{
     error::Error,
     io::{stdout, Write},
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
@@ -40,8 +41,78 @@ pub struct Options {
     line_length: usize,
 }
 
+pub enum IOCommand {
+    Break,
+    OnKey(char),
+    OnEnter,
+    OnEsc,
+    OnLeft,
+    OnRight,
+    OnUp,
+    OnDown,
+    SubscribeToFeed,
+    SelectFeeds,
+    UpdateCurrentFeedAndEntries,
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn start_async_io(
+    app: Arc<Mutex<App>>,
+    rx: crossbeam_channel::Receiver<IOCommand>,
+    // conn: &rusqlite::Connection,
+) -> Result<(), crate::error::Error> {
+    use IOCommand::*;
+    while let Ok(event) = rx.recv() {
+        match event {
+            Break => break,
+            OnKey(c) => {
+                let mut app = app.lock().unwrap();
+                app.on_key(c).await;
+            }
+            SubscribeToFeed => {
+                let mut app = app.lock().unwrap();
+                app.subscribe_to_feed().await?;
+                app.feed_subscription_input = String::new();
+            }
+            SelectFeeds => {
+                let mut app = app.lock().unwrap();
+                app.select_feeds().await;
+            }
+            UpdateCurrentFeedAndEntries => {
+                let mut app = app.lock().unwrap();
+                app.update_current_feed_and_entries()?;
+            }
+            OnLeft => {
+                let mut app = app.lock().unwrap();
+                app.on_left().await?;
+            }
+            OnRight => {
+                let mut app = app.lock().unwrap();
+                app.on_right().await?;
+            }
+            OnUp => {
+                let mut app = app.lock().unwrap();
+                app.on_up().await?;
+            }
+            OnDown => {
+                let mut app = app.lock().unwrap();
+                app.on_down().await?;
+            }
+            OnEnter => {
+                let mut app = app.lock().unwrap();
+                app.on_enter().await?;
+            }
+            OnEsc => {
+                let mut app = app.lock().unwrap();
+                app.on_esc();
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
     let options: Options = Options::from_args();
 
     enable_raw_mode()?;
@@ -74,69 +145,109 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    let mut app = App::new(options)?;
+    // let conn = rusqlite::Connection::open(&options.database_path)?;
+
+    let app = Arc::new(Mutex::new(App::new(options)?));
+
+    let cloned_app = Arc::clone(&app);
 
     terminal.clear()?;
 
+    let (io_s, io_r) = crossbeam_channel::unbounded();
+
+    // this thread is for async IO
+    let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {
+        start_async_io(app, io_r)?;
+        Ok(())
+    });
+
+    // MAIN THREAD IS DRAW THREAD
     loop {
-        terminal.draw(|mut f| ui::draw(&mut f, &mut app))?;
-        match app.mode {
-            Mode::Normal => {
-                match rx.recv()? {
-                    Event::Input(event) => match event.code {
-                        KeyCode::Char('q') => {
-                            if app.error_flash.is_some() {
-                                app.error_flash = None;
-                            } else {
-                                disable_raw_mode()?;
-                                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                                terminal.show_cursor()?;
-                                break;
-                            }
-                        }
-                        KeyCode::Char(c) => app.on_key(c).await,
-                        KeyCode::Left => app.on_left(),
-                        KeyCode::Up => app.on_up()?,
-                        KeyCode::Right => app.on_right()?,
-                        KeyCode::Down => app.on_down()?,
-                        KeyCode::Enter => app.on_enter()?,
-                        KeyCode::Esc => app.on_esc(),
-                        _ => {}
-                    },
-                    Event::Tick => (),
-                }
-                if app.should_quit {
-                    break;
-                }
-            }
-            Mode::Editing => {
-                match rx.recv()? {
-                    Event::Input(event) => match event.code {
-                        KeyCode::Enter => {
-                            app.subscribe_to_feed().await?;
-                            app.feed_subscription_input = String::new();
-                            app.select_feeds().await;
-                            app.update_current_feed_and_entries()?;
-                        }
-                        KeyCode::Char(c) => {
-                            app.feed_subscription_input.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            app.feed_subscription_input.pop();
-                        }
-                        KeyCode::Esc => {
-                            app.mode = Mode::Normal;
-                        }
-                        _ => {}
-                    },
-                    Event::Tick => (),
-                }
-                if app.should_quit {
-                    break;
-                }
-            }
+        {
+            let mut app = cloned_app.lock().unwrap();
+            terminal.draw(|mut f| ui::draw(&mut f, &mut app))?;
         }
+        // match app.mode {
+        //     Mode::Normal => {
+        match rx.recv()? {
+            Event::Input(event) => match event.code {
+                KeyCode::Char('q') => {
+                    let mut app = cloned_app.lock().unwrap();
+                    if app.error_flash.is_some() {
+                        app.error_flash = None;
+                    } else {
+                        disable_raw_mode()?;
+                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                        terminal.show_cursor()?;
+                        io_s.send(IOCommand::Break)?;
+                        break;
+                    }
+                }
+                KeyCode::Char(c) => {
+                    io_s.send(IOCommand::OnKey(c))?;
+                    // app.on_key(c).await
+                }
+                KeyCode::Left => {
+                    io_s.send(IOCommand::OnLeft)?;
+                    // app.on_left()
+                }
+                KeyCode::Up => {
+                    io_s.send(IOCommand::OnUp)?;
+                    // app.on_up()?
+                }
+                KeyCode::Right => {
+                    io_s.send(IOCommand::OnRight)?;
+                    // app.on_right()?
+                }
+                KeyCode::Down => {
+                    io_s.send(IOCommand::OnDown)?;
+                    // app.on_down()?
+                }
+                KeyCode::Enter => {
+                    io_s.send(IOCommand::OnEnter)?;
+                    // app.on_enter()?
+                }
+                KeyCode::Esc => {
+                    io_s.send(IOCommand::OnEsc)?;
+                    // app.on_esc(),
+                }
+                _ => {}
+            },
+            Event::Tick => (),
+        }
+        // if app.should_quit {
+        //     break;
+        // }
+        // }
+        // Mode::Editing => {
+        //     match rx.recv()? {
+        //         Event::Input(event) => match event.code {
+        //             KeyCode::Enter => {
+        //                 io_s.send(SubscribeToFeed)?;
+        //                 io_s.send(SelectFeeds)?;
+        //                 io_s.send(UpdateCurrentFeedAndEntries)?;
+        //             }
+        //             KeyCode::Char(c) => {
+        //                 app.feed_subscription_input.push(c);
+        //             }
+        //             KeyCode::Backspace => {
+        //                 app.feed_subscription_input.pop();
+        //             }
+        //             KeyCode::Esc => {
+        //                 app.mode = Mode::Normal;
+        //             }
+        //             _ => {}
+        //         },
+        //         Event::Tick => (),
+        //     }
+        //     if app.should_quit {
+        //         break;
+        //     }
+        // }
+        // }
     }
+
+    io_thread.join().unwrap()?;
 
     Ok(())
 }
