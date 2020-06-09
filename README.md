@@ -79,9 +79,9 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] profiling mode that shows speed of UI interaction
 - [ ] stabilize the database schema
 - [ ] migration process for database changes
-- [ ] nonblocking IO
+- [x] nonblocking IO
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
 - [ ] deleting feeds
-- [ ] refresh all feeds
+- [x] refresh all feeds
 - [ ] some kind of search

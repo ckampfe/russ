@@ -115,16 +115,8 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub async fn select_feeds(&mut self) {
+    pub fn select_feeds(&mut self) {
         self.selected = Selected::Feeds;
-    }
-
-    pub async fn subscribe_to_feed(&mut self) -> Result<(), Error> {
-        let _feed_id =
-            crate::rss::subscribe_to_feed(&self.conn, &self.feed_subscription_input).await?;
-        let feeds = crate::rss::get_feeds(&self.conn)?.into();
-        self.feeds = feeds;
-        Ok(())
     }
 
     fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry, Error>> {
@@ -209,7 +201,7 @@ impl<'app> App<'app> {
         }
     }
 
-    pub fn on_left(&mut self) {
+    pub fn on_left(&mut self) -> Result<(), Error> {
         match self.selected {
             Selected::Feeds => (),
             Selected::Entries => self.selected = Selected::Feeds,
@@ -221,6 +213,8 @@ impl<'app> App<'app> {
                 }
             }
         }
+
+        Ok(())
     }
 
     pub fn on_enter(&mut self) -> Result<(), Error> {
@@ -279,18 +273,10 @@ impl<'app> App<'app> {
         }
     }
 
-    pub async fn on_refresh(&mut self) -> Result<(), Error> {
-        let selected_idx = self.feeds.state.selected().unwrap();
-        let feed_id = self.feeds.items[selected_idx].id;
-        let _ = crate::rss::refresh_feed(&self.conn, feed_id).await?;
-        self.update_current_feed_and_entries()?;
-        Ok(())
-    }
-
-    pub async fn toggle_read(&mut self) -> Result<(), Error> {
+    pub fn toggle_read(&mut self) -> Result<(), Error> {
         match &self.selected {
             Selected::Entry(entry) => {
-                entry.toggle_read(&self.conn).await?;
+                entry.toggle_read(&self.conn)?;
                 self.update_current_entries()?;
                 if let Some(entry) = self.get_selected_entry() {
                     let entry = entry?;
@@ -301,7 +287,7 @@ impl<'app> App<'app> {
             }
             Selected::Entries => {
                 if let Some(entry) = &self.current_entry {
-                    entry.toggle_read(&self.conn).await?;
+                    entry.toggle_read(&self.conn)?;
                     self.update_current_entries()?;
                     if let Some(entry) = self.get_selected_entry() {
                         let entry = entry?;
@@ -315,7 +301,7 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub async fn toggle_read_mode(&mut self) -> Result<(), Error> {
+    pub fn toggle_read_mode(&mut self) -> Result<(), Error> {
         match (&self.read_mode, &self.selected) {
             (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
                 self.read_mode = ReadMode::ShowUnread
@@ -341,10 +327,14 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    pub async fn on_key(&mut self, c: char) {
+    pub fn on_key(&mut self, c: char) {
         match c {
             // vim-style movement
-            'h' => self.on_left(),
+            'h' => {
+                if let Err(e) = self.on_left() {
+                    self.error_flash = Some(e)
+                }
+            }
             'j' => {
                 if let Err(e) = self.on_down() {
                     self.error_flash = Some(e)
@@ -360,21 +350,8 @@ impl<'app> App<'app> {
                     self.error_flash = Some(e)
                 }
             }
-            // controls
-            'r' => match self.selected {
-                Selected::Feeds => {
-                    if let Err(e) = self.on_refresh().await {
-                        self.error_flash = Some(e)
-                    }
-                }
-                _ => {
-                    if let Err(e) = self.toggle_read().await {
-                        self.error_flash = Some(e)
-                    }
-                }
-            },
             'a' => {
-                if let Err(e) = self.toggle_read_mode().await {
+                if let Err(e) = self.toggle_read_mode() {
                     self.error_flash = Some(e)
                 }
             }

@@ -290,14 +290,17 @@ fn draw_help<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
-    let msg = match app.mode {
-        Mode::Normal => "i - edit mode; q - exit",
-        Mode::Editing => "esc - normal mode; enter - fetch feed",
-    };
     let text = [
-        Text::raw("r - mark entry read/un; a - toggle view read/un\n"),
-        Text::raw(msg),
+        match app.selected {
+            Selected::Feeds => Text::raw("r - refresh selected feed; x - refresh all feeds\n"),
+            _ => Text::raw("r - mark entry read/un; a - toggle view read/un\n"),
+        },
+        match app.mode {
+            Mode::Normal => Text::raw("i - edit mode; q - exit"),
+            Mode::Editing => Text::raw("esc - normal mode; enter - fetch feed"),
+        },
     ];
+
     let help_message = Paragraph::new(text.iter());
     f.render_widget(help_message, area);
 }

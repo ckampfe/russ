@@ -5,7 +5,7 @@ pub enum Selected {
     Entry(crate::rss::Entry),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     Editing,
     Normal,
