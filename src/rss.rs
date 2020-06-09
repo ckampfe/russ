@@ -78,7 +78,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub async fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+    pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
         if self.read_at.is_none() {
             self.mark_entry_as_read(&conn)
         } else {
