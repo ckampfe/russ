@@ -1,7 +1,7 @@
 use crate::modes::*;
 use app::App;
 use crossterm::{
-    event::{self, Event as CEvent, KeyCode},
+    event::{self, Event as CEvent, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -168,8 +168,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         match mode {
             Mode::Normal => match rx.recv()? {
-                Event::Input(event) => match event.code {
-                    KeyCode::Char('q') => {
+                Event::Input(event) => match (event.code, event.modifiers) {
+                    (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                         let mut app = cloned_app.lock().unwrap();
                         if app.error_flash.is_some() {
                             app.error_flash = None;
@@ -181,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             break;
                         }
                     }
-                    KeyCode::Char('r') => {
+                    (KeyCode::Char('r'), KeyModifiers::NONE) => {
                         let mut app = cloned_app.lock().unwrap();
                         match &app.selected {
                             Selected::Feeds => {
@@ -194,7 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             _ => app.toggle_read()?,
                         }
                     }
-                    KeyCode::Char('x') => {
+                    (KeyCode::Char('x'), KeyModifiers::NONE) => {
                         let feed_ids = {
                             let app = cloned_app.lock().unwrap();
                             crate::rss::get_feeds(&app.conn)?
@@ -205,31 +205,31 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                         io_s.send(IOCommand::RefreshAllFeeds(feed_ids))?;
                     }
-                    KeyCode::Char(c) => {
+                    (KeyCode::Char(c), KeyModifiers::NONE) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_key(c)
                     }
-                    KeyCode::Left => {
+                    (KeyCode::Left, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_left()?
                     }
-                    KeyCode::Up => {
+                    (KeyCode::Up, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_up()?
                     }
-                    KeyCode::Right => {
+                    (KeyCode::Right, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_right()?
                     }
-                    KeyCode::Down => {
+                    (KeyCode::Down, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_down()?
                     }
-                    KeyCode::Enter => {
+                    (KeyCode::Enter, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_enter()?
                     }
-                    KeyCode::Esc => {
+                    (KeyCode::Esc, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_esc()
                     }
