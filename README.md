@@ -79,7 +79,7 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] profiling mode that shows speed of UI interaction
 - [ ] stabilize the database schema
 - [ ] migration process for database changes
-- [x] nonblocking IO
+- [x] nonblocking IO (inspiration: https://keliris.dev/improving-spotify-tui/)
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
 - [ ] deleting feeds
