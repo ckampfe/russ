@@ -59,9 +59,13 @@ async fn start_async_io(
         match event {
             Break => break,
             RefreshFeed(feed_id) => {
-                crate::rss::refresh_feed(&conn, feed_id).await?;
-                let mut app = app.lock().unwrap();
-                app.update_current_feed_and_entries()?;
+                if let Err(e) = crate::rss::refresh_feed(&conn, feed_id).await {
+                    let mut app = app.lock().unwrap();
+                    app.error_flash = Some(e);
+                } else {
+                    let mut app = app.lock().unwrap();
+                    app.update_current_feed_and_entries()?;
+                };
             }
             RefreshAllFeeds(feed_ids) => {
                 // TODO: this is currently synchronous,
@@ -75,7 +79,8 @@ async fn start_async_io(
                     if let Err(e) = future.await {
                         let mut app = app.lock().unwrap();
                         app.error_flash = Some(e);
-                        break;
+                        // don't `break` here, as we still want to try to
+                        // finish the rest of the feeds
                     }
                 }
 
