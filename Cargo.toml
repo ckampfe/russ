@@ -16,8 +16,8 @@ reqwest = "0.10.6"
 rss = "1.9.0"
 structopt = "0.3.14"
 rusqlite = { version = "0.23.1", features = ["chrono"] }
-tokio = { version = "0.2.21", features = ["full"] }
-tui = { version = "0.9.5", default-features = false, features = ['crossterm'] }
+tokio = { version = "0.2.21", default-features = false, features = ["macros"] }
+tui = { version = "0.9.5", default-features = false, features = ["crossterm"] }
 
 [profile.release]
 codegen-units = 1
