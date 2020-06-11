@@ -85,5 +85,5 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] deleting feeds
 - [x] refresh all feeds
 - [ ] some kind of search
-- [ ] fix N+1 queries on feed/entry creation
+- [x] fix N+1 queries on feed/entry creation
 - [ ] set up CI
