@@ -174,7 +174,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         match mode {
             Mode::Normal => match rx.recv()? {
                 Event::Input(event) => match (event.code, event.modifiers) {
-                    (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                    (KeyCode::Char('q'), _)
+                    | (KeyCode::Char('c'), KeyModifiers::CONTROL)
+                    | (KeyCode::Esc, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         if app.error_flash.is_some() {
                             app.error_flash = None;
@@ -233,10 +235,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     (KeyCode::Enter, _) => {
                         let mut app = cloned_app.lock().unwrap();
                         app.on_enter()?
-                    }
-                    (KeyCode::Esc, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_esc()
                     }
                     _ => {}
                 },

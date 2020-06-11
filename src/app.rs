@@ -265,14 +265,6 @@ impl<'app> App<'app> {
         }
     }
 
-    pub fn on_esc(&mut self) {
-        match self.selected {
-            Selected::Entry(_) => self.selected = Selected::Entries,
-            Selected::Entries => (),
-            Selected::Feeds => (),
-        }
-    }
-
     pub fn toggle_read(&mut self) -> Result<(), Error> {
         match &self.selected {
             Selected::Entry(entry) => {
