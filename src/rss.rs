@@ -3,7 +3,7 @@ use crate::modes::ReadMode;
 use atom_syndication as atom;
 use chrono::prelude::*;
 use rss::Channel;
-use rusqlite::{params, NO_PARAMS};
+use rusqlite::{params, ToSql, NO_PARAMS};
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -203,10 +203,7 @@ impl FromStr for FeedAndEntries {
 pub async fn subscribe_to_feed(conn: &rusqlite::Connection, url: &str) -> Result<FeedId, Error> {
     let feed_and_entries: FeedAndEntries = fetch_feed(url).await?;
     let feed_id = create_feed(conn, &feed_and_entries.feed)?;
-    // N+1!!!! YEAH BABY
-    for entry in feed_and_entries.entries {
-        add_entry_to_feed(conn, feed_id, &entry)?;
-    }
+    add_entries_to_feed(conn, feed_id, &feed_and_entries.entries)?;
 
     Ok(feed_id)
 }
@@ -222,10 +219,7 @@ async fn fetch_feed(url: &str) -> Result<FeedAndEntries, Error> {
 /// fetches the feed and stores the new entries
 /// uses the link as the uniqueness key.
 /// TODO hash the content to see if anything changed, and update that way.
-pub async fn refresh_feed(
-    conn: &rusqlite::Connection,
-    feed_id: FeedId,
-) -> Result<Vec<EntryId>, Error> {
+pub async fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), Error> {
     let feed_url = get_feed_url(conn, feed_id)?;
     let remote_feed: FeedAndEntries = fetch_feed(&feed_url).await?;
     let remote_items = remote_feed.entries;
@@ -245,21 +239,19 @@ pub async fn refresh_feed(
         .cloned()
         .collect::<HashSet<_>>();
 
-    let mut inserted_item_ids = vec![];
+    let items_to_add = remote_items
+        .into_iter()
+        .filter(|item| match &item.link {
+            Some(link) => difference.contains(link.as_str()),
+            None => false,
+        })
+        .collect::<Vec<_>>();
 
-    let items_to_add = remote_items.into_iter().filter(|item| match &item.link {
-        Some(link) => difference.contains(link.as_str()),
-        None => false,
-    });
-
-    for item in items_to_add {
-        let item_id = add_entry_to_feed(conn, feed_id, &item)?;
-        inserted_item_ids.push(item_id);
-    }
+    add_entries_to_feed(conn, feed_id, &items_to_add)?;
 
     update_feed_refreshed_at(&conn, feed_id)?;
 
-    Ok(inserted_item_ids)
+    Ok(())
 }
 
 pub fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
@@ -312,36 +304,90 @@ fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId, Error
     Ok(conn.last_insert_rowid())
 }
 
-fn add_entry_to_feed(
+fn add_entries_to_feed(
     conn: &rusqlite::Connection,
     feed_id: FeedId,
-    entry: &Entry,
-) -> Result<EntryId, Error> {
-    conn.execute(
-        "INSERT INTO entries (
-            feed_id, 
-            title, 
-            author, 
-            pub_date, 
-            description, 
-            content, 
-            link, 
-            updated_at
-         )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![
-            feed_id,
-            entry.title,
-            entry.author,
-            entry.pub_date,
-            entry.description,
-            entry.content,
-            entry.link,
-            Utc::now()
-        ],
-    )?;
+    entries: &[Entry],
+) -> Result<(), Error> {
+    if !entries.is_empty() {
+        let now = Utc::now();
 
-    Ok(conn.last_insert_rowid())
+        let mut entries_values = vec![];
+
+        for entry in entries {
+            entries_values.append(&mut vec![
+                feed_id.to_sql()?,
+                entry.title.to_sql()?,
+                entry.author.to_sql()?,
+                entry.pub_date.to_sql()?,
+                entry.description.to_sql()?,
+                entry.content.to_sql()?,
+                entry.link.to_sql()?,
+                now.to_sql()?,
+            ]);
+        }
+
+        // this seems cool but probably not the right fit:
+        // https://stackoverflow.com/questions/54177438/how-to-programmatically-get-the-number-of-fields-of-a-struct
+        let query = build_bulk_insert_query(
+            "entries",
+            &[
+                "feed_id",
+                "title",
+                "author",
+                "pub_date",
+                "description",
+                "content",
+                "link",
+                "updated_at",
+            ],
+            &entries_values,
+            entries_values.len() / entries.len(),
+        );
+
+        conn.execute(&query, entries_values)?;
+    }
+
+    Ok(())
+}
+
+fn build_bulk_insert_query<T>(
+    table: &str,
+    columns: &[&str],
+    entries_values: &[T],
+    entry_fields_len: usize,
+) -> String {
+    let idxs = (1..entries_values.len() + 1).collect::<Vec<_>>();
+    let mut parameter_groups_strings = Vec::with_capacity(entries_values.len());
+    let mut parameters_values = Vec::with_capacity(entry_fields_len);
+
+    for chunk in idxs.chunks(entry_fields_len) {
+        parameters_values.clear();
+        let mut parameter_group_string = "(".to_string();
+        for i in chunk {
+            parameters_values.push(format!("?{}", i))
+        }
+        let parameter_values_string = parameters_values.join(", ");
+        parameter_group_string.push_str(&parameter_values_string);
+        parameter_group_string.push_str(")");
+        parameter_groups_strings.push(parameter_group_string);
+    }
+
+    let paramter_groups_string = parameter_groups_strings.join(", ");
+
+    let mut columns_string = "".to_string();
+    columns_string.push_str("(");
+    columns_string.push_str(&columns.join(", "));
+    columns_string.push_str(") ");
+
+    let mut query = String::new();
+    query.push_str("INSERT INTO ");
+    query.push_str(table);
+    query.push_str(&columns_string);
+    query.push_str("VALUES ");
+    query.push_str(&paramter_groups_string);
+
+    query
 }
 
 pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed, Error> {
