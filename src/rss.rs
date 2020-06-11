@@ -549,18 +549,6 @@ pub fn get_entries(
     Ok(result)
 }
 
-// fn drop_db(conn: &rusqlite::Connection) -> Result<(), Error> {
-//     conn.execute("DROP TABLE IF EXISTS feeds", NO_PARAMS)?;
-//     conn.execute("DROP TABLE IF EXISTS entries", NO_PARAMS)?;
-//     Ok(())
-// }
-
-// fn drop_and_initialize_db(location: &PathBuf) -> Result<(), Error> {
-//     drop_db(location)?;
-//     initialize_db(location)?;
-//     Ok(())
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
