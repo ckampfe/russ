@@ -90,4 +90,4 @@ It stores all application data in a SQLite database file at a location of your c
 - [x] refresh all feeds
 - [ ] some kind of search
 - [x] fix N+1 queries on feed/entry creation
-- [ ] set up CI
+- [x] set up CI
