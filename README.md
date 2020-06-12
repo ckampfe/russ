@@ -4,6 +4,10 @@ Russ is a really simple RSS reader built for my own use.
 If you happen to like it, that's great!
 At this time I cannot guarantee any kind of stability in either the software itself or the data format, or a timeframe for achieving stability. Caveat emptor.
 
+[![CircleCI](https://circleci.com/gh/ckampfe/russ.svg?style=svg)](https://circleci.com/gh/ckampfe/russ)
+
+---
+
 <img src="entries.png"></img>
 <img src="entry.png"></img>
 
