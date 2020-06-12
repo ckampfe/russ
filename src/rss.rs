@@ -583,9 +583,11 @@ mod tests {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
         subscribe_to_feed(&conn, ZCT).await.unwrap();
-
         let feed_id = 1;
-        let new_entry_ids = refresh_feed(&conn, feed_id).await.unwrap();
-        assert_eq!(new_entry_ids.len(), 0)
+        let old_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
+        refresh_feed(&conn, feed_id).await.unwrap();
+        let new_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
+
+        assert_eq!(old_entries, new_entries);
     }
 }
