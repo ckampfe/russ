@@ -68,7 +68,7 @@ pub struct Entry {
     pub feed_id: FeedId,
     pub title: Option<String>,
     pub author: Option<String>,
-    pub pub_date: Option<String>,
+    pub pub_date: Option<chrono::DateTime<Utc>>,
     pub description: Option<String>,
     pub content: Option<String>,
     pub link: Option<String>,
@@ -106,7 +106,7 @@ impl From<&atom::Entry> for Entry {
             feed_id: -1,
             title: Some(entry.title().to_string()),
             author: entry.authors().get(0).map(|author| author.name.to_owned()),
-            pub_date: entry.published().map(|date| date.to_string()),
+            pub_date: entry.published().map(|date| date.with_timezone(&Utc)),
             description: None,
             content: entry.content().and_then(|content| content.value.to_owned()),
             link: entry.links().get(0).map(|link| link.href().to_string()),
@@ -124,7 +124,7 @@ impl From<&rss::Item> for Entry {
             feed_id: -1,
             title: entry.title().map(|title| title.to_owned()),
             author: entry.author().map(|author| author.to_owned()),
-            pub_date: entry.pub_date().map(|pub_date| pub_date.to_owned()),
+            pub_date: entry.pub_date().and_then(parse_datetime),
             description: entry
                 .description()
                 .map(|description| description.to_owned()),
@@ -135,6 +135,24 @@ impl From<&rss::Item> for Entry {
             updated_at: Utc::now(),
         }
     }
+}
+
+fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
+    if let Ok(res) = DateTime::parse_from_rfc2822(s).map(|dt| dt.with_timezone(&Utc)) {
+        return Some(res);
+    }
+
+    if let Ok(res) = DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)) {
+        return Some(res);
+    }
+
+    if let Ok(res) =
+        NaiveDateTime::parse_from_str(s, "%Y-%M-%d").map(|dt| DateTime::from_utc(dt, Utc))
+    {
+        return Some(res);
+    }
+
+    None
 }
 
 struct FeedAndEntries {
@@ -283,6 +301,12 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
+        NO_PARAMS,
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index 
+        ON entries (feed_id, pub_date, inserted_at)",
         NO_PARAMS,
     )?;
 
@@ -530,7 +554,7 @@ pub fn get_entries(
         .to_string();
 
     query.push_str(read_at_predicate);
-    query.push_str("\nORDER BY inserted_at DESC");
+    query.push_str("\nORDER BY pub_date DESC, inserted_at DESC");
 
     let mut statement = conn.prepare(&query)?;
     let result = statement

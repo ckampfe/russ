@@ -80,6 +80,8 @@ It stores all application data in a SQLite database file at a location of your c
 - [x] display entry info
 - [x] display feed info
 - [x] configurable word wrapping line length
+- [x] parse and store proper `chrono::DateTime<Utc>` for `pub_date`
+- [x] sort entries by `pub_date` descending, fall back to `inserted_at` if no `pub_date`
 - [ ] profiling mode that shows speed of UI interaction
 - [ ] stabilize the database schema
 - [ ] migration process for database changes
