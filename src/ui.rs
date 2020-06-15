@@ -26,15 +26,25 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             draw_entries(f, chunks[1], app);
         }
         Selected::Entry(entry) => {
-            let default_title = String::from("Entry");
-            let title = entry.title.as_ref().unwrap_or_else(|| &default_title);
+            let default_entry_title = "No entry title".to_string();
+            let default_feed_title = "No feed title".to_string();
+
+            let entry_title = entry.title.as_ref().unwrap_or_else(|| &default_entry_title);
+
+            let current_feed_title = app
+                .current_feed
+                .as_ref()
+                .and_then(|feed| feed.title.as_ref())
+                .unwrap_or_else(|| &default_feed_title);
+
             draw_entry(
                 f,
                 chunks[1],
                 app.entry_scroll_position,
                 &app.current_entry_text,
-                title,
+                entry_title,
                 &app.error_flash,
+                &current_feed_title,
             );
         }
     }
@@ -330,10 +340,19 @@ where
         .items
         .iter()
         .map(|entry| Text::raw(entry.title.as_ref().unwrap()));
+
+    let default_title = "Entries".to_string();
+
+    let title = app
+        .current_feed
+        .as_ref()
+        .and_then(|feed| feed.title.as_ref())
+        .unwrap_or_else(|| &default_title);
+
     let entries_titles = List::new(entries).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Entries")
+            .title(&title)
             .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
     );
 
@@ -388,15 +407,20 @@ fn draw_entry<B>(
     area: Rect,
     scroll: u16,
     current_entry_text: &[Text],
-    title: &str,
+    entry_title: &str,
     error_flash: &Option<crate::error::Error>,
+    feed_title: &str,
 ) where
     B: Backend,
 {
     let text = current_entry_text;
+    let mut title = entry_title.to_string();
+    title.push_str(" - ");
+    title.push_str(feed_title);
+
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(title)
+        .title(&title)
         .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
     let paragraph = Paragraph::new(text.iter())
         .block(block)
