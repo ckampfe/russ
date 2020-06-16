@@ -90,6 +90,7 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] debug view (show app state)
 - [ ] deleting feeds
 - [x] refresh all feeds
+- [x] refresh all feeds in parallel (multithreaded IO)
 - [ ] some kind of search
 - [x] fix N+1 queries on feed/entry creation
 - [x] set up CI

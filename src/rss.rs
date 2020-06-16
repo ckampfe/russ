@@ -218,16 +218,16 @@ impl FromStr for FeedAndEntries {
     }
 }
 
-pub async fn subscribe_to_feed(conn: &rusqlite::Connection, url: &str) -> Result<FeedId, Error> {
-    let feed_and_entries: FeedAndEntries = fetch_feed(url).await?;
+pub fn subscribe_to_feed(conn: &rusqlite::Connection, url: &str) -> Result<FeedId, Error> {
+    let feed_and_entries: FeedAndEntries = fetch_feed(url)?;
     let feed_id = create_feed(conn, &feed_and_entries.feed)?;
     add_entries_to_feed(conn, feed_id, &feed_and_entries.entries)?;
 
     Ok(feed_id)
 }
 
-async fn fetch_feed(url: &str) -> Result<FeedAndEntries, Error> {
-    let resp = reqwest::get(url).await?.text().await?;
+fn fetch_feed(url: &str) -> Result<FeedAndEntries, Error> {
+    let resp = reqwest::blocking::get(url)?.text()?;
     let mut feed = FeedAndEntries::from_str(&resp)?;
     feed.set_feed_link(url);
 
@@ -237,9 +237,9 @@ async fn fetch_feed(url: &str) -> Result<FeedAndEntries, Error> {
 /// fetches the feed and stores the new entries
 /// uses the link as the uniqueness key.
 /// TODO hash the content to see if anything changed, and update that way.
-pub async fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), Error> {
+pub fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), Error> {
     let feed_url = get_feed_url(conn, feed_id)?;
-    let remote_feed: FeedAndEntries = fetch_feed(&feed_url).await?;
+    let remote_feed: FeedAndEntries = fetch_feed(&feed_url)?;
     let remote_items = remote_feed.entries;
     let remote_items_links = remote_items
         .iter()
@@ -584,17 +584,17 @@ mod tests {
     use super::*;
     const ZCT: &str = "https://zeroclarkthirty.com/feed";
 
-    #[tokio::test]
-    async fn it_fetches() {
-        let feed_and_entries = fetch_feed(ZCT).await.unwrap();
+    #[test]
+    fn it_fetches() {
+        let feed_and_entries = fetch_feed(ZCT).unwrap();
         assert!(feed_and_entries.entries.len() > 0)
     }
 
-    #[tokio::test]
-    async fn it_subscribes_to_a_feed() {
+    #[test]
+    fn it_subscribes_to_a_feed() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
-        subscribe_to_feed(&conn, ZCT).await.unwrap();
+        subscribe_to_feed(&conn, ZCT).unwrap();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM entries", NO_PARAMS, |row| row.get(0))
             .unwrap();
@@ -602,14 +602,14 @@ mod tests {
         assert!(count > 50)
     }
 
-    #[tokio::test]
-    async fn refresh_feed_does_not_add_any_items_if_there_are_no_new_items() {
+    #[test]
+    fn refresh_feed_does_not_add_any_items_if_there_are_no_new_items() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
-        subscribe_to_feed(&conn, ZCT).await.unwrap();
+        subscribe_to_feed(&conn, ZCT).unwrap();
         let feed_id = 1;
         let old_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
-        refresh_feed(&conn, feed_id).await.unwrap();
+        refresh_feed(&conn, feed_id).unwrap();
         let new_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
         assert_eq!(old_entries, new_entries);

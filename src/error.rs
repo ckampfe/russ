@@ -10,6 +10,7 @@ pub enum Error {
     FromSqlError(rusqlite::types::FromSqlError),
     NetworkError(reqwest::Error),
     RssError(rss::Error),
+    ThreadJoinError(String),
 }
 
 impl std::error::Error for Error {}
@@ -53,5 +54,11 @@ impl From<reqwest::Error> for Error {
 impl From<rss::Error> for Error {
     fn from(error: rss::Error) -> Error {
         Error::RssError(error)
+    }
+}
+
+impl From<Box<dyn std::any::Any + Send + 'static>> for Error {
+    fn from(error: Box<dyn std::any::Any + Send + 'static>) -> Error {
+        Error::ThreadJoinError(format!("{:?}", error))
     }
 }

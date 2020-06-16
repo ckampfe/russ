@@ -48,18 +48,18 @@ pub enum IOCommand {
     SubscribeToFeed(String),
 }
 
-#[tokio::main]
-async fn start_async_io(
+fn start_async_io(
     app: Arc<Mutex<App>>,
     rx: crossbeam_channel::Receiver<IOCommand>,
-    conn: &rusqlite::Connection,
+    database_path: &std::path::PathBuf,
 ) -> Result<(), crate::error::Error> {
     use IOCommand::*;
     while let Ok(event) = rx.recv() {
         match event {
             Break => break,
             RefreshFeed(feed_id) => {
-                if let Err(e) = crate::rss::refresh_feed(&conn, feed_id).await {
+                let conn = rusqlite::Connection::open(&database_path)?;
+                if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                     let mut app = app.lock().unwrap();
                     app.error_flash = Some(e);
                 } else {
@@ -68,19 +68,31 @@ async fn start_async_io(
                 };
             }
             RefreshAllFeeds(feed_ids) => {
-                // TODO: this is currently synchronous,
-                // because Connection is not thread safe.
-                let mut futures = vec![];
+                let mut thread_handles = vec![];
                 for feed_id in feed_ids {
-                    futures.push(crate::rss::refresh_feed(conn, feed_id));
+                    let database_path = database_path.clone();
+                    let thread_handle = std::thread::spawn(move || {
+                        let conn = rusqlite::Connection::open(&database_path)?;
+                        crate::rss::refresh_feed(&conn, feed_id)
+                    });
+
+                    thread_handles.push(thread_handle);
                 }
 
-                for future in futures {
-                    if let Err(e) = future.await {
-                        let mut app = app.lock().unwrap();
-                        app.error_flash = Some(e);
-                        // don't `break` here, as we still want to try to
-                        // finish the rest of the feeds
+                for thread_handle in thread_handles {
+                    match thread_handle.join() {
+                        Ok(res) => {
+                            if let Err(e) = res {
+                                let mut app = app.lock().unwrap();
+                                app.error_flash = Some(e);
+                                // don't `break` here, as we still want to try to
+                                // finish the rest of the feeds
+                            }
+                        }
+                        Err(e) => {
+                            let mut app = app.lock().unwrap();
+                            app.error_flash = Some(e.into());
+                        }
                     }
                 }
 
@@ -88,8 +100,8 @@ async fn start_async_io(
                 app.update_current_feed_and_entries()?;
             }
             SubscribeToFeed(feed_subscription_input) => {
-                if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input).await
-                {
+                let conn = rusqlite::Connection::open(&database_path)?;
+                if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
                     let mut app = app.lock().unwrap();
                     app.error_flash = Some(e);
                 } else {
@@ -148,7 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    let conn = rusqlite::Connection::open(&options.database_path)?;
+    let database_path = options.database_path.clone();
 
     let app = Arc::new(Mutex::new(App::new(options)?));
 
@@ -160,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // this thread is for async IO
     let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {
-        start_async_io(app, io_r, &conn)?;
+        start_async_io(app, io_r, &database_path)?;
         Ok(())
     });
 
