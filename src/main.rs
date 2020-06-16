@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::{
     error::Error,
     io::{stdout, Write},
+    sync::mpsc,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -50,7 +51,7 @@ pub enum IOCommand {
 
 fn start_async_io(
     app: Arc<Mutex<App>>,
-    rx: crossbeam_channel::Receiver<IOCommand>,
+    rx: mpsc::Receiver<IOCommand>,
     database_path: &std::path::PathBuf,
 ) -> Result<(), crate::error::Error> {
     use IOCommand::*;
@@ -141,7 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     terminal.hide_cursor()?;
 
     // Setup input handling
-    let (tx, rx) = crossbeam_channel::unbounded();
+    let (tx, rx) = mpsc::channel();
 
     let tick_rate = Duration::from_millis(options.tick_rate);
     thread::spawn(move || {
@@ -168,7 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     terminal.clear()?;
 
-    let (io_s, io_r) = crossbeam_channel::unbounded();
+    let (io_s, io_r) = mpsc::channel();
 
     // this thread is for async IO
     let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {

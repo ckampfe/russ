@@ -178,16 +178,15 @@ where
             .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
     );
 
-    let feeds = if app.selected == Selected::Feeds {
-        feeds
+    let feeds = match app.selected {
+        Selected::Feeds => feeds
             .highlight_style(
                 Style::default()
                     .fg(Color::Rgb(255, 150, 167))
                     .modifier(Modifier::BOLD),
             )
-            .highlight_symbol("> ")
-    } else {
-        feeds
+            .highlight_symbol("> "),
+        _ => feeds,
     };
 
     f.render_stateful_widget(feeds, area, &mut app.feeds.state);
@@ -356,16 +355,15 @@ where
             .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
     );
 
-    let entries_titles = if app.selected == Selected::Entries {
-        entries_titles
+    let entries_titles = match app.selected {
+        Selected::Entries => entries_titles
             .highlight_style(
                 Style::default()
                     .fg(Color::Rgb(255, 150, 167))
                     .modifier(Modifier::BOLD),
             )
-            .highlight_symbol("> ")
-    } else {
-        entries_titles
+            .highlight_symbol("> "),
+        _ => entries_titles,
     };
 
     if let Some(error) = &app.error_flash {

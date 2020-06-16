@@ -10,7 +10,7 @@ use std::str::FromStr;
 type EntryId = i64;
 pub type FeedId = i64;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub enum FeedKind {
     Atom,
     RSS,
@@ -50,7 +50,7 @@ impl FromStr for FeedKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Feed {
     pub id: FeedId,
     pub title: Option<String>,
@@ -62,7 +62,7 @@ pub struct Feed {
     pub updated_at: chrono::DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Entry {
     pub id: EntryId,
     pub feed_id: FeedId,
@@ -610,8 +610,10 @@ mod tests {
         let feed_id = 1;
         let old_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
         refresh_feed(&conn, feed_id).unwrap();
+        let e = get_entry(&conn, 1).unwrap();
+        e.mark_entry_as_read(&conn).unwrap();
         let new_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
-        assert_eq!(old_entries, new_entries);
+        assert_eq!(new_entries.len(), old_entries.len() - 1);
     }
 }

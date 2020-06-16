@@ -4,7 +4,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     AtomError(atom::Error),
-    ChannelError(crossbeam_channel::RecvError),
     DatabaseError(rusqlite::Error),
     FeedKindError(String),
     FromSqlError(rusqlite::types::FromSqlError),
@@ -24,12 +23,6 @@ impl fmt::Display for Error {
 impl From<atom::Error> for Error {
     fn from(error: atom::Error) -> Error {
         Error::AtomError(error)
-    }
-}
-
-impl From<crossbeam_channel::RecvError> for Error {
-    fn from(error: crossbeam_channel::RecvError) -> Error {
-        Error::ChannelError(error)
     }
 }
 
