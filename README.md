@@ -91,6 +91,8 @@ It stores all application data in a SQLite database file at a location of your c
 - [ ] deleting feeds
 - [x] refresh all feeds
 - [x] refresh all feeds in parallel (multithreaded IO)
+- [x] show refresh time for single feed and all feeds
+- [ ] mark entries as "favorite"
 - [ ] some kind of search
 - [x] fix N+1 queries on feed/entry creation
 - [x] set up CI
