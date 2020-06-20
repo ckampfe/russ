@@ -24,6 +24,7 @@ pub struct App<'app> {
     // misc
     pub error_flash: Option<Error>,
     pub feed_subscription_input: String,
+    pub flash: Option<String>,
 }
 
 impl<'app> App<'app> {
@@ -51,6 +52,7 @@ impl<'app> App<'app> {
             mode: Mode::Normal,
             read_mode: ReadMode::ShowUnread,
             entry_selection_position: 0,
+            flash: None,
         };
 
         app.update_feeds()?;

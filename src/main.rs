@@ -9,10 +9,8 @@ use std::path::PathBuf;
 use std::{
     error::Error,
     io::{stdout, Write},
-    sync::mpsc,
-    sync::{Arc, Mutex},
-    thread,
-    time::{Duration, Instant},
+    sync::{mpsc, Arc, Mutex},
+    thread, time,
 };
 use structopt::*;
 use tui::{backend::CrosstermBackend, Terminal};
@@ -29,7 +27,7 @@ enum Event<I> {
     Tick,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 pub struct Options {
     /// feed database path
     #[structopt(short, long)]
@@ -40,6 +38,14 @@ pub struct Options {
     /// maximum line length for entries
     #[structopt(short, long, default_value = "90")]
     line_length: usize,
+    /// number of seconds to show the flash message before clearing it
+    #[structopt(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
+    flash_display_duration_seconds: time::Duration,
+}
+
+fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
+    let as_u64 = u64::from_str_radix(s, 10)?;
+    Ok(time::Duration::from_secs(as_u64))
 }
 
 pub enum IOCommand {
@@ -47,31 +53,55 @@ pub enum IOCommand {
     RefreshFeed(i64),
     RefreshAllFeeds(Vec<i64>),
     SubscribeToFeed(String),
+    ClearFlash,
 }
 
 fn start_async_io(
     app: Arc<Mutex<App>>,
+    sx: &mpsc::Sender<IOCommand>,
     rx: mpsc::Receiver<IOCommand>,
-    database_path: &std::path::PathBuf,
+    options: &Options,
 ) -> Result<(), crate::error::Error> {
     use IOCommand::*;
     while let Ok(event) = rx.recv() {
         match event {
             Break => break,
             RefreshFeed(feed_id) => {
-                let conn = rusqlite::Connection::open(&database_path)?;
+                let now = std::time::Instant::now();
+
+                {
+                    let mut app = app.lock().unwrap();
+                    app.flash = Some("Refreshing feed...".to_string());
+                }
+
+                let conn = rusqlite::Connection::open(&options.database_path)?;
+
                 if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                     let mut app = app.lock().unwrap();
                     app.error_flash = Some(e);
                 } else {
-                    let mut app = app.lock().unwrap();
-                    app.update_current_feed_and_entries()?;
+                    {
+                        let mut app = app.lock().unwrap();
+                        app.update_current_feed_and_entries()?;
+                        let elapsed = now.elapsed();
+                        app.flash = Some(format!("Refreshed feed in {:?}", elapsed));
+                    }
+
+                    clear_flash_after(&sx, &options.flash_display_duration_seconds);
                 };
             }
             RefreshAllFeeds(feed_ids) => {
+                let now = std::time::Instant::now();
+
                 let mut thread_handles = vec![];
+
+                {
+                    let mut app = app.lock().unwrap();
+                    app.flash = Some("Refreshing all feeds...".to_string());
+                }
+
                 for feed_id in feed_ids {
-                    let database_path = database_path.clone();
+                    let database_path = options.database_path.clone();
                     let thread_handle = std::thread::spawn(move || {
                         let conn = rusqlite::Connection::open(&database_path)?;
                         crate::rss::refresh_feed(&conn, feed_id)
@@ -97,11 +127,26 @@ fn start_async_io(
                     }
                 }
 
-                let mut app = app.lock().unwrap();
-                app.update_current_feed_and_entries()?;
+                {
+                    let mut app = app.lock().unwrap();
+                    app.update_current_feed_and_entries()?;
+
+                    let elapsed = now.elapsed();
+                    app.flash = Some(format!("Refreshed all feeds in {:?}", elapsed));
+                }
+
+                clear_flash_after(&sx, &options.flash_display_duration_seconds);
             }
             SubscribeToFeed(feed_subscription_input) => {
-                let conn = rusqlite::Connection::open(&database_path)?;
+                let now = std::time::Instant::now();
+
+                {
+                    let mut app = app.lock().unwrap();
+                    app.flash = Some("Subscribing to feed...".to_string());
+                }
+
+                let conn = rusqlite::Connection::open(&options.database_path)?;
+
                 if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
                     let mut app = app.lock().unwrap();
                     app.error_flash = Some(e);
@@ -109,11 +154,18 @@ fn start_async_io(
                     match crate::rss::get_feeds(&conn) {
                         Ok(l) => {
                             let feeds = l.into();
-                            let mut app = app.lock().unwrap();
-                            app.feed_subscription_input = String::new();
-                            app.feeds = feeds;
-                            app.select_feeds();
-                            app.update_current_feed_and_entries()?;
+                            {
+                                let mut app = app.lock().unwrap();
+                                app.feed_subscription_input = String::new();
+                                app.feeds = feeds;
+                                app.select_feeds();
+                                app.update_current_feed_and_entries()?;
+
+                                let elapsed = now.elapsed();
+                                app.flash = Some(format!("Subscribed in {:?}", elapsed));
+                            }
+
+                            clear_flash_after(&sx, &options.flash_display_duration_seconds);
                         }
                         Err(e) => {
                             let mut app = app.lock().unwrap();
@@ -122,10 +174,23 @@ fn start_async_io(
                     };
                 }
             }
+            ClearFlash => {
+                let mut app = app.lock().unwrap();
+                app.flash = None;
+            }
         }
     }
 
     Ok(())
+}
+
+fn clear_flash_after(sx: &mpsc::Sender<IOCommand>, duration: &time::Duration) {
+    let sx = sx.clone();
+    let duration = *duration;
+    thread::spawn(move || {
+        thread::sleep(duration);
+        sx.send(IOCommand::ClearFlash).unwrap();
+    });
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -144,9 +209,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Setup input handling
     let (tx, rx) = mpsc::channel();
 
-    let tick_rate = Duration::from_millis(options.tick_rate);
+    let tick_rate = time::Duration::from_millis(options.tick_rate);
     thread::spawn(move || {
-        let mut last_tick = Instant::now();
+        let mut last_tick = time::Instant::now();
         loop {
             // poll for tick rate duration, if no events, sent tick event.
             if event::poll(tick_rate - last_tick.elapsed()).unwrap() {
@@ -156,12 +221,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             if last_tick.elapsed() >= tick_rate {
                 tx.send(Event::Tick).unwrap();
-                last_tick = Instant::now();
+                last_tick = time::Instant::now();
             }
         }
     });
 
-    let database_path = options.database_path.clone();
+    let options_clone = options.clone();
 
     let app = Arc::new(Mutex::new(App::new(options)?));
 
@@ -171,9 +236,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let (io_s, io_r) = mpsc::channel();
 
+    let io_s_clone = io_s.clone();
+
     // this thread is for async IO
     let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {
-        start_async_io(app, io_r, &database_path)?;
+        start_async_io(app, &io_s_clone, io_r, &options_clone)?;
         Ok(())
     });
 

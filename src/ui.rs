@@ -54,16 +54,23 @@ fn draw_info_column<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
+    let constraints = match &app.mode {
+        Mode::Normal => [
+            Constraint::Percentage(70),
+            Constraint::Percentage(20),
+            Constraint::Percentage(10),
+        ]
+        .as_ref(),
+        Mode::Editing => [
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
+            Constraint::Percentage(10),
+            Constraint::Percentage(10),
+        ]
+        .as_ref(),
+    };
     let chunks = Layout::default()
-        .constraints(
-            [
-                Constraint::Percentage(60),
-                Constraint::Percentage(30),
-                Constraint::Percentage(4),
-                Constraint::Percentage(5),
-            ]
-            .as_ref(),
-        )
+        .constraints(constraints)
         .direction(Direction::Vertical)
         .split(area);
     {
@@ -91,7 +98,9 @@ where
         draw_help(f, chunks[2], app);
 
         // INPUT SECTION
-        draw_new_feed_input(f, chunks[3], app);
+        if let Mode::Editing = &app.mode {
+            draw_new_feed_input(f, chunks[3], app)
+        }
     }
 }
 
@@ -171,10 +180,14 @@ where
         .iter()
         .flat_map(|feed| feed.title.as_ref())
         .map(Text::raw);
+
+    let default_title = String::from("Feeds");
+    let title = app.flash.as_ref().unwrap_or_else(|| &default_title);
+
     let feeds = List::new(feeds).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Feeds")
+            .title(&title)
             .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
     );
 
@@ -310,7 +323,7 @@ where
         },
     ];
 
-    let help_message = Paragraph::new(text.iter());
+    let help_message = Paragraph::new(text.iter()).block(Block::default().borders(Borders::ALL));
     f.render_widget(help_message, area);
 }
 
