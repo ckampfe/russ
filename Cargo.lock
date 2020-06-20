@@ -1172,7 +1172,7 @@ dependencies = [
 [[package]]
 name = "rss"
 version = "1.9.0"
-source = "git+https://github.com/rust-syndication/rss#570c8da17322c5862890e8d727cfb8e084e42d74"
+source = "git+https://github.com/rust-syndication/rss?rev=570c8da#570c8da17322c5862890e8d727cfb8e084e42d74"
 dependencies = [
  "derive_builder",
  "quick-xml",
@@ -1445,9 +1445,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.31"
+version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5304cfdf27365b7585c25d4af91b35016ed21ef88f17ced89c7093b43dba8b6"
+checksum = "a994520748611c17d163e81b6c4a4b13d11b7f63884362ab2efac3aa9cf16d00"
 dependencies = [
  "proc-macro2",
  "quote",
