@@ -2,9 +2,9 @@
 # It is not intended for manual editing.
 [[package]]
 name = "addr2line"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a49806b9dadc843c61e7c97e72490ad7f7220ae249012fbda9ad0609457c0543"
+checksum = "602d785912f476e480434627e8732e6766b760c045bbf897d9dfaa9f4fbd399c"
 dependencies = [
  "gimli",
 ]
@@ -255,9 +255,9 @@ dependencies = [
 
 [[package]]
 name = "diligent-date-parser"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9842bdac146cd03b14b3c6056cd9856124b226cfe97c92159a00e122bd1a694"
+checksum = "28caca0eb64b9b22bdcab47424e0f7716af92d33ad035f765e5ec2b08cf14fcc"
 dependencies = [
  "chrono",
 ]
@@ -1202,6 +1202,7 @@ dependencies = [
  "atom_syndication",
  "chrono",
  "crossterm",
+ "diligent-date-parser",
  "html2text",
  "reqwest",
  "rss",

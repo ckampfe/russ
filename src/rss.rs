@@ -138,21 +138,7 @@ impl From<&rss::Item> for Entry {
 }
 
 fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
-    if let Ok(res) = DateTime::parse_from_rfc2822(s).map(|dt| dt.with_timezone(&Utc)) {
-        return Some(res);
-    }
-
-    if let Ok(res) = DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)) {
-        return Some(res);
-    }
-
-    if let Ok(res) =
-        NaiveDateTime::parse_from_str(s, "%Y-%M-%d").map(|dt| DateTime::from_utc(dt, Utc))
-    {
-        return Some(res);
-    }
-
-    None
+    diligent_date_parser::parse_date(s).map(|dt| dt.with_timezone(&Utc))
 }
 
 struct FeedAndEntries {
