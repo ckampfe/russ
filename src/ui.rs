@@ -7,7 +7,7 @@ use tui::{
 };
 
 use crate::app::App;
-use crate::modes::{Mode, Selected};
+use crate::modes::{Mode, ReadMode, Selected};
 use crate::rss::Entry;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
@@ -282,7 +282,11 @@ where
 
     text.push({
         let mut s = String::new();
-        s.push_str("Total entries: ");
+        match app.read_mode {
+            ReadMode::ShowUnread => s.push_str("Unread entries: "),
+            ReadMode::ShowRead => s.push_str("Read entries: "),
+            ReadMode::All => unreachable!("ReadMode::All should never be possible from the UI!"),
+        }
         s.push_str(app.entries.items.len().to_string().as_str());
         s.push_str("\n");
         Text::raw(s)

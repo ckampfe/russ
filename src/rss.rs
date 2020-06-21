@@ -232,7 +232,7 @@ pub fn refresh_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), 
         .flat_map(|item| &item.link)
         .cloned()
         .collect::<HashSet<String>>();
-    // let local_entries_links = get_entries_links(conn, feed_id)?;
+
     let local_entries_links = get_entries(conn, &ReadMode::All, feed_id)?
         .into_iter()
         .flat_map(|entry| entry.link)
