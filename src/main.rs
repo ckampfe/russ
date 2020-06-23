@@ -5,10 +5,10 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::path::PathBuf;
 use std::{
     error::Error,
     io::{stdout, Write},
+    path::PathBuf,
     sync::{mpsc, Arc, Mutex},
     thread, time,
 };
