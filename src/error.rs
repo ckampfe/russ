@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     AtomError(atom::Error),
+    DatabaseConnectionPoolError(r2d2::Error),
     DatabaseError(rusqlite::Error),
     FeedKindError(String),
     FromSqlError(rusqlite::types::FromSqlError),
@@ -29,6 +30,12 @@ impl From<atom::Error> for Error {
 impl From<rusqlite::Error> for Error {
     fn from(error: rusqlite::Error) -> Error {
         Error::DatabaseError(error)
+    }
+}
+
+impl From<r2d2::Error> for Error {
+    fn from(error: r2d2::Error) -> Error {
+        Error::DatabaseConnectionPoolError(error)
     }
 }
 

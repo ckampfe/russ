@@ -63,6 +63,10 @@ fn start_async_io(
     options: &Options,
 ) -> Result<(), crate::error::Error> {
     use IOCommand::*;
+
+    let manager = r2d2_sqlite::SqliteConnectionManager::file(&options.database_path);
+    let pool = r2d2::Pool::new(manager)?;
+
     while let Ok(event) = rx.recv() {
         match event {
             Break => break,
@@ -74,7 +78,7 @@ fn start_async_io(
                     app.flash = Some("Refreshing feed...".to_string());
                 }
 
-                let conn = rusqlite::Connection::open(&options.database_path)?;
+                let conn = pool.get()?;
 
                 if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                     let mut app = app.lock().unwrap();
@@ -101,9 +105,9 @@ fn start_async_io(
                 }
 
                 for feed_id in feed_ids {
-                    let database_path = options.database_path.clone();
+                    let pool = pool.clone();
                     let thread_handle = std::thread::spawn(move || {
-                        let conn = rusqlite::Connection::open(&database_path)?;
+                        let conn = pool.get()?;
                         crate::rss::refresh_feed(&conn, feed_id)
                     });
 
@@ -145,7 +149,7 @@ fn start_async_io(
                     app.flash = Some("Subscribing to feed...".to_string());
                 }
 
-                let conn = rusqlite::Connection::open(&options.database_path)?;
+                let conn = pool.get()?;
 
                 if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
                     let mut app = app.lock().unwrap();
