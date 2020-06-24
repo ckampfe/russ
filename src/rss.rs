@@ -455,23 +455,23 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>, Error> {
           updated_at 
         FROM feeds ORDER BY title ASC",
     )?;
-    let result = statement
-        .query_map(NO_PARAMS, |row| {
-            Ok(Feed {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                feed_link: row.get(2)?,
-                link: row.get(3)?,
-                feed_kind: row.get(4)?,
-                refreshed_at: row.get(5)?,
-                inserted_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?
-        .map(|s| s.unwrap())
-        .collect::<Vec<Feed>>();
+    let mut feeds = vec![];
+    for feed in statement.query_map(NO_PARAMS, |row| {
+        Ok(Feed {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            feed_link: row.get(2)?,
+            link: row.get(3)?,
+            feed_kind: row.get(4)?,
+            refreshed_at: row.get(5)?,
+            inserted_at: row.get(6)?,
+            updated_at: row.get(7)?,
+        })
+    })? {
+        feeds.push(feed?)
+    }
 
-    Ok(result)
+    Ok(feeds)
 }
 
 pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry, Error> {
@@ -543,26 +543,26 @@ pub fn get_entries(
     query.push_str("\nORDER BY pub_date DESC, inserted_at DESC");
 
     let mut statement = conn.prepare(&query)?;
-    let result = statement
-        .query_map(params![feed_id], |row| {
-            Ok(Entry {
-                id: row.get(0)?,
-                feed_id: row.get(1)?,
-                title: row.get(2)?,
-                author: row.get(3)?,
-                pub_date: row.get(4)?,
-                description: row.get(5)?,
-                content: row.get(6)?,
-                link: row.get(7)?,
-                read_at: row.get(8)?,
-                inserted_at: row.get(9)?,
-                updated_at: row.get(10)?,
-            })
-        })?
-        .map(|entry| entry.unwrap())
-        .collect::<Vec<_>>();
+    let mut entries = vec![];
+    for entry in statement.query_map(params![feed_id], |row| {
+        Ok(Entry {
+            id: row.get(0)?,
+            feed_id: row.get(1)?,
+            title: row.get(2)?,
+            author: row.get(3)?,
+            pub_date: row.get(4)?,
+            description: row.get(5)?,
+            content: row.get(6)?,
+            link: row.get(7)?,
+            read_at: row.get(8)?,
+            inserted_at: row.get(9)?,
+            updated_at: row.get(10)?,
+        })
+    })? {
+        entries.push(entry?)
+    }
 
-    Ok(result)
+    Ok(entries)
 }
 
 #[cfg(test)]
