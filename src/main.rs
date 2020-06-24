@@ -50,8 +50,8 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
 
 pub enum IOCommand {
     Break,
-    RefreshFeed(i64),
-    RefreshAllFeeds(Vec<i64>),
+    RefreshFeed(crate::rss::FeedId),
+    RefreshAllFeeds(Vec<crate::rss::FeedId>),
     SubscribeToFeed(String),
     ClearFlash,
 }
