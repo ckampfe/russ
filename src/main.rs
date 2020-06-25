@@ -48,7 +48,7 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
     Ok(time::Duration::from_secs(as_u64))
 }
 
-pub enum IOCommand {
+enum IOCommand {
     Break,
     RefreshFeed(crate::rss::FeedId),
     RefreshAllFeeds(Vec<crate::rss::FeedId>),
