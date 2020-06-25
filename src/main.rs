@@ -5,6 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use rayon::prelude::*;
 use std::{
     error::Error,
     io::{stdout, Write},
@@ -97,39 +98,25 @@ fn start_async_io(
             RefreshAllFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
 
-                let mut thread_handles = vec![];
-
                 {
                     let mut app = app.lock().unwrap();
                     app.flash = Some("Refreshing all feeds...".to_string());
                 }
 
-                for feed_id in feed_ids {
-                    let pool = pool.clone();
-                    let thread_handle = std::thread::spawn(move || {
-                        let conn = pool.get()?;
-                        crate::rss::refresh_feed(&conn, feed_id)
-                    });
-
-                    thread_handles.push(thread_handle);
-                }
-
-                for thread_handle in thread_handles {
-                    match thread_handle.join() {
-                        Ok(res) => {
-                            if let Err(e) = res {
+                feed_ids
+                    .into_par_iter()
+                    .for_each(|feed_id| match pool.get() {
+                        Ok(conn) => {
+                            if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                                 let mut app = app.lock().unwrap();
                                 app.error_flash = Some(e);
-                                // don't `break` here, as we still want to try to
-                                // finish the rest of the feeds
                             }
                         }
                         Err(e) => {
                             let mut app = app.lock().unwrap();
                             app.error_flash = Some(e.into());
                         }
-                    }
-                }
+                    });
 
                 {
                     let mut app = app.lock().unwrap();
