@@ -23,12 +23,15 @@ mod rss;
 mod ui;
 mod util;
 
+const RUSS_VERSION: &str = env!("RUSS_VERSION");
+
 enum Event<I> {
     Input(I),
     Tick,
 }
 
 #[derive(Clone, Debug, StructOpt)]
+#[structopt(name = "russ", version = crate::RUSS_VERSION)]
 pub struct Options {
     /// feed database path
     #[structopt(short, long)]
