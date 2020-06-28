@@ -1,6 +1,6 @@
 # russ
 
-Russ is a really simple RSS/Atom reader designed with vim-like controls and an offline-first focus.
+Russ is a really simple RSS/Atom reader with vim-like controls and an offline-first focus.
 
 See the [license](LICENSE) if you're curious about that kind of thing.
 
