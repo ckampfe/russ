@@ -37,8 +37,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Unset
-          command: git config --global --unset url.ssh://git@github.com:.insteadof
+          name: Start ssh-agent
+          command: eval $(ssh-agent -s)
       - run:
           name: Download rustup
           command: |
