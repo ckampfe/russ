@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  win: circleci/windows@2.2.0
+  win: circleci/windows@2.4.0
 
 jobs:
   build-linux:
@@ -35,6 +35,9 @@ jobs:
     executor:
       name: win/default
     steps:
+      - run:
+        name: Install rustup
+        command: Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe
       - checkout
       - run:
           name: Version information
