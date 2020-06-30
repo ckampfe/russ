@@ -48,6 +48,11 @@ jobs:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
+          name: Fix cargo
+          command: |
+            mkdir ~/.cargo
+            cat "[net]\r\ngit-fetch-with-cli = true" > ~/.cargo/config
+      - run:
           name: Calculate dependencies
           command: cargo generate-lockfile
       - restore_cache:
