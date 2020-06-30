@@ -50,7 +50,7 @@ jobs:
       - run:
           name: Fix cargo
           command: |
-            echo [net]\r\ngit-fetch-with-cli = true > ~/.cargo/config
+            echo \n[net]\ngit-fetch-with-cli = true >> ~/.cargo/config
       - run:
           name: Calculate dependencies
           command: cargo generate-lockfile
