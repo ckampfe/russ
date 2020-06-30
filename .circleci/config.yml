@@ -53,6 +53,9 @@ jobs:
             echo [net] >> ~/.cargo/config
             echo git-fetch-with-cli = true >> ~/.cargo/config
       - run:
+          name: Echo cargo config
+          command: echo ~/.cargo/config
+      - run:
           name: Calculate dependencies
           command: cargo generate-lockfile
       - restore_cache:
