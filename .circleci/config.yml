@@ -36,8 +36,9 @@ jobs:
       name: win/default
     steps:
       - checkout
-        post:
-          - git config --global --unset url.ssh://git@github.com:.insteadof
+      - run:
+          name: Unset
+          command: git config --global --unset url.ssh://git@github.com:.insteadof
       - run:
           name: Download rustup
           command: |
