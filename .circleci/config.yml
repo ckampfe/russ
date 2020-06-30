@@ -38,7 +38,7 @@ jobs:
       - checkout
       - run:
           name: Start ssh-agent
-          command: start-ssh-agent
+          command: start-ssh-agent -s
       - run:
           name: Download rustup
           command: |
