@@ -35,10 +35,10 @@ jobs:
     executor:
       name: win/default
     steps:
+      - checkout
       - run:
         name: Install rustup
         command: Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe
-      - checkout
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
