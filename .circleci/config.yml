@@ -51,7 +51,7 @@ jobs:
           name: Fix cargo
           command: |
             echo [net] >> ~/.cargo/config
-            echo git-fetch-with-cli = true >> ~/.cargo/config
+            echo "git-fetch-with-cli = true" >> ~/.cargo/config
       - run:
           name: Echo cargo config
           command: type ~/.cargo/config
