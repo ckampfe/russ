@@ -43,7 +43,7 @@ jobs:
             Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -OutFile rustup-init.exe
       - run:
           name: Run rustup
-          command: ./rustup-init.exe -y
+          command: CARGO_NET_GIT_FETCH_WITH_CLI=true ./rustup-init.exe -y
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
