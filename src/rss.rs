@@ -453,7 +453,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>, Error> {
           refreshed_at, 
           inserted_at, 
           updated_at 
-        FROM feeds ORDER BY title ASC",
+        FROM feeds ORDER BY lower(title) ASC",
     )?;
     let mut feeds = vec![];
     for feed in statement.query_map(NO_PARAMS, |row| {
