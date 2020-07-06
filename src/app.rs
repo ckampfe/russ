@@ -22,7 +22,7 @@ pub struct App<'app> {
     pub mode: Mode,
     pub read_mode: ReadMode,
     // misc
-    pub error_flash: Option<Error>,
+    pub error_flash: Vec<Error>,
     pub feed_subscription_input: String,
     pub flash: Option<String>,
 }
@@ -40,7 +40,7 @@ impl<'app> App<'app> {
             conn,
             line_length: options.line_length,
             should_quit: false,
-            error_flash: None,
+            error_flash: vec![],
             feeds: initial_feed_titles,
             entries: initial_entries,
             selected,
@@ -326,27 +326,27 @@ impl<'app> App<'app> {
             // vim-style movement
             'h' => {
                 if let Err(e) = self.on_left() {
-                    self.error_flash = Some(e)
+                    self.error_flash.push(e);
                 }
             }
             'j' => {
                 if let Err(e) = self.on_down() {
-                    self.error_flash = Some(e)
+                    self.error_flash.push(e);
                 }
             }
             'k' => {
                 if let Err(e) = self.on_up() {
-                    self.error_flash = Some(e)
+                    self.error_flash.push(e);
                 }
             }
             'l' => {
                 if let Err(e) = self.on_right() {
-                    self.error_flash = Some(e)
+                    self.error_flash.push(e);
                 }
             }
             'a' => {
                 if let Err(e) = self.toggle_read_mode() {
-                    self.error_flash = Some(e)
+                    self.error_flash.push(e);
                 }
             }
             'e' | 'i' => {

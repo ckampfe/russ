@@ -383,19 +383,27 @@ where
         _ => entries_titles,
     };
 
-    if let Some(error) = &app.error_flash {
+    if !&app.error_flash.is_empty() {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
             .direction(Direction::Vertical)
             .split(area);
         {
-            let error_text = format!("{:?}", error)
-                .split('\n')
-                .map(|line| {
-                    let mut s = String::with_capacity(line.len() + 1);
-                    s.push_str(line);
-                    s.push_str("\n");
-                    Text::raw(s)
+            let error_text = app
+                .error_flash
+                .iter()
+                .flat_map(|error| {
+                    let mut e = format!("{:?}", error)
+                        .split('\n')
+                        .map(|line| {
+                            let mut s = String::with_capacity(line.len() + 1);
+                            s.push_str(line);
+                            s.push_str("\n");
+                            Text::raw(s)
+                        })
+                        .collect::<Vec<_>>();
+                    e.push(Text::raw("\n"));
+                    e
                 })
                 .collect::<Vec<_>>();
 
@@ -423,7 +431,7 @@ fn draw_entry<B>(
     scroll: u16,
     current_entry_text: &[Text],
     entry_title: &str,
-    error_flash: &Option<crate::error::Error>,
+    error_flash: &[crate::error::Error],
     feed_title: &str,
 ) where
     B: Backend,
@@ -442,7 +450,7 @@ fn draw_entry<B>(
         .wrap(true)
         .scroll(scroll);
 
-    if let Some(error) = error_flash {
+    if !error_flash.is_empty() {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
             .direction(Direction::Vertical)
@@ -450,13 +458,20 @@ fn draw_entry<B>(
         {
             // see https://github.com/dtolnay/indoc/blob/902c3eba53a7c1206ee43262768e6dff6f882f29/unindent/src/lib.rs#L123-L130
             // for a function that can count leading spaces.
-            let error_text = format!("{:?}", error)
-                .split('\n')
-                .map(|line| {
-                    let mut s = String::with_capacity(line.len() + 1);
-                    s.push_str(line);
-                    s.push_str("\n");
-                    Text::raw(s)
+            let error_text = error_flash
+                .iter()
+                .flat_map(|error| {
+                    let mut e = format!("{:?}", error)
+                        .split('\n')
+                        .map(|line| {
+                            let mut s = String::with_capacity(line.len() + 1);
+                            s.push_str(line);
+                            s.push_str("\n");
+                            Text::raw(s)
+                        })
+                        .collect::<Vec<_>>();
+                    e.push(Text::raw("\n"));
+                    e
                 })
                 .collect::<Vec<_>>();
 

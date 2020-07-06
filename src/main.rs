@@ -86,7 +86,7 @@ fn start_async_io(
 
                 if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                     let mut app = app.lock().unwrap();
-                    app.error_flash = Some(e);
+                    app.error_flash.push(e);
                 } else {
                     {
                         let mut app = app.lock().unwrap();
@@ -112,12 +112,12 @@ fn start_async_io(
                         Ok(conn) => {
                             if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
                                 let mut app = app.lock().unwrap();
-                                app.error_flash = Some(e);
+                                app.error_flash.push(e);
                             }
                         }
                         Err(e) => {
                             let mut app = app.lock().unwrap();
-                            app.error_flash = Some(e.into());
+                            app.error_flash.push(e.into());
                         }
                     });
 
@@ -143,7 +143,7 @@ fn start_async_io(
 
                 if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
                     let mut app = app.lock().unwrap();
-                    app.error_flash = Some(e);
+                    app.error_flash.push(e);
                 } else {
                     match crate::rss::get_feeds(&conn) {
                         Ok(l) => {
@@ -163,7 +163,7 @@ fn start_async_io(
                         }
                         Err(e) => {
                             let mut app = app.lock().unwrap();
-                            app.error_flash = Some(e);
+                            app.error_flash.push(e);
                         }
                     };
                 }
@@ -252,8 +252,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     | (KeyCode::Char('c'), KeyModifiers::CONTROL)
                     | (KeyCode::Esc, _) => {
                         let mut app = cloned_app.lock().unwrap();
-                        if app.error_flash.is_some() {
-                            app.error_flash = None;
+                        if !app.error_flash.is_empty() {
+                            app.error_flash = vec![];
                         } else {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
