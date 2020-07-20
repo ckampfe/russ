@@ -2,7 +2,8 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, Paragraph, Text},
+    text::{Span, Spans, Text},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -108,64 +109,48 @@ fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry: &Entry)
 where
     B: Backend,
 {
-    let mut text = vec![];
+    let mut text = String::new();
     if let Some(item) = &entry.title {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Title: ");
-            s.push_str(item.to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        });
-    }
+        text.push_str("Title: ");
+        text.push_str(item.to_string().as_str());
+        text.push_str("\n");
+    };
 
     if let Some(item) = &entry.link {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Link: ");
-            s.push_str(item);
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Link: ");
+        text.push_str(item);
+        text.push_str("\n");
     }
 
     if let Some(pub_date) = &entry.pub_date {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Pub. date: ");
-            s.push_str(pub_date.to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Pub. date: ");
+        text.push_str(pub_date.to_string().as_str());
+        text.push_str("\n");
     } else {
         // TODO this should probably pull the <updated> tag
         // and use that
         let inserted_at = entry.inserted_at;
-        text.push({
-            let mut s = String::new();
-            s.push_str("Pulled date: ");
-            s.push_str(inserted_at.to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Pulled date: ");
+        text.push_str(inserted_at.to_string().as_str());
+        text.push_str("\n");
     }
 
     if let Some(read_at) = &entry.read_at {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Read at: ");
-            s.push_str(read_at.to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Read at: ");
+        text.push_str(read_at.to_string().as_str());
+        text.push_str("\n");
     }
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("Info")
-        .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+    let block = Block::default().borders(Borders::ALL).title(Span::styled(
+        "Info",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    ));
 
-    let paragraph = Paragraph::new(text.iter()).block(block).wrap(true);
+    let paragraph = Paragraph::new(Text::from(text.as_str()))
+        .block(block)
+        .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, area);
 }
@@ -179,16 +164,20 @@ where
         .items
         .iter()
         .flat_map(|feed| feed.title.as_ref())
-        .map(Text::raw);
+        .map(Span::raw)
+        .map(ListItem::new)
+        .collect::<Vec<ListItem>>();
 
     let default_title = String::from("Feeds");
     let title = app.flash.as_ref().unwrap_or_else(|| &default_title);
 
     let feeds = List::new(feeds).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(&title)
-            .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
+        Block::default().borders(Borders::ALL).title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
     );
 
     let feeds = match app.selected {
@@ -196,7 +185,7 @@ where
             .highlight_style(
                 Style::default()
                     .fg(Color::Rgb(255, 150, 167))
-                    .modifier(Modifier::BOLD),
+                    .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> "),
         _ => feeds,
@@ -209,19 +198,15 @@ fn draw_feed_info<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
-    let mut text = vec![];
+    let mut text = String::new();
     if let Some(item) = &app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.title.as_ref())
     {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Title: ");
-            s.push_str(item.to_owned().to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        });
+        text.push_str("Title: ");
+        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str("\n");
     }
 
     if let Some(item) = &app
@@ -229,13 +214,9 @@ where
         .as_ref()
         .and_then(|feed| feed.link.as_ref())
     {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Link: ");
-            s.push_str(item.to_owned().to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Link: ");
+        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str("\n");
     }
 
     if let Some(item) = &app
@@ -243,24 +224,16 @@ where
         .as_ref()
         .and_then(|feed| feed.feed_link.as_ref())
     {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Feed link: ");
-            s.push_str(item.to_owned().to_string().as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Feed link: ");
+        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str("\n");
     }
 
     if let Some(item) = app.entries.items.get(0) {
         if let Some(pub_date) = &item.pub_date {
-            text.push({
-                let mut s = String::new();
-                s.push_str("Most recent entry at: ");
-                s.push_str(pub_date.to_string().as_str());
-                s.push_str("\n");
-                Text::raw(s)
-            })
+            text.push_str("Most recent entry at: ");
+            text.push_str(pub_date.to_string().as_str());
+            text.push_str("\n");
         }
     }
 
@@ -271,43 +244,35 @@ where
         .map(|timestamp| timestamp.to_owned().to_string())
         .or_else(|| Some("Never refreshed".to_string()))
     {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Refreshed at: ");
-            s.push_str(item.as_str());
-            s.push_str("\n");
-            Text::raw(s)
-        })
+        text.push_str("Refreshed at: ");
+        text.push_str(item.as_str());
+        text.push_str("\n");
     }
 
-    text.push({
-        let mut s = String::new();
-        match app.read_mode {
-            ReadMode::ShowUnread => s.push_str("Unread entries: "),
-            ReadMode::ShowRead => s.push_str("Read entries: "),
-            ReadMode::All => unreachable!("ReadMode::All should never be possible from the UI!"),
-        }
-        s.push_str(app.entries.items.len().to_string().as_str());
-        s.push_str("\n");
-        Text::raw(s)
-    });
+    match app.read_mode {
+        ReadMode::ShowUnread => text.push_str("Unread entries: "),
+        ReadMode::ShowRead => text.push_str("Read entries: "),
+        ReadMode::All => unreachable!("ReadMode::All should never be possible from the UI!"),
+    }
+    text.push_str(app.entries.items.len().to_string().as_str());
+    text.push_str("\n");
 
     if let Some(feed_kind) = app.current_feed.as_ref().map(|feed| feed.feed_kind) {
-        text.push({
-            let mut s = String::new();
-            s.push_str("Feed kind: ");
-            s.push_str(&feed_kind.to_string());
-            s.push_str("\n");
-            Text::raw(s)
-        });
+        text.push_str("Feed kind: ");
+        text.push_str(&feed_kind.to_string());
+        text.push_str("\n");
     }
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("Info")
-        .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+    let block = Block::default().borders(Borders::ALL).title(Span::styled(
+        "Info",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    ));
 
-    let paragraph = Paragraph::new(text.iter()).block(block).wrap(true);
+    let paragraph = Paragraph::new(Text::from(text.as_str()))
+        .block(block)
+        .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, area);
 }
@@ -316,18 +281,18 @@ fn draw_help<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
-    let text = [
-        match app.selected {
-            Selected::Feeds => Text::raw("r - refresh selected feed; x - refresh all feeds\n"),
-            _ => Text::raw("r - mark entry read/un; a - toggle view read/un\n"),
-        },
-        match app.mode {
-            Mode::Normal => Text::raw("i - edit mode; q - exit"),
-            Mode::Editing => Text::raw("esc - normal mode; enter - fetch feed"),
-        },
-    ];
+    let mut text = String::new();
+    match app.selected {
+        Selected::Feeds => text.push_str("r - refresh selected feed; x - refresh all feeds\n"),
+        _ => text.push_str("r - mark entry read/un; a - toggle view read/un\n"),
+    }
+    match app.mode {
+        Mode::Normal => text.push_str("i - edit mode; q - exit"),
+        Mode::Editing => text.push_str("esc - normal mode; enter - fetch feed"),
+    }
 
-    let help_message = Paragraph::new(text.iter()).block(Block::default().borders(Borders::ALL));
+    let help_message =
+        Paragraph::new(Text::from(text.as_str())).block(Block::default().borders(Borders::ALL));
     f.render_widget(help_message, area);
 }
 
@@ -335,14 +300,17 @@ fn draw_new_feed_input<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
 where
     B: Backend,
 {
-    let text = [Text::raw(&app.feed_subscription_input)];
-    let input = Paragraph::new(text.iter())
+    let text = &app.feed_subscription_input;
+    let text = Text::from(text.as_str());
+    let input = Paragraph::new(text)
         .style(Style::default().fg(Color::Yellow))
         .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Add a feed")
-                .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
+            Block::default().borders(Borders::ALL).title(Span::styled(
+                "Add a feed",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
         );
     f.render_widget(input, area);
 }
@@ -355,7 +323,8 @@ where
         .entries
         .items
         .iter()
-        .map(|entry| Text::raw(entry.title.as_ref().unwrap()));
+        .map(|entry| ListItem::new(Span::raw(entry.title.as_ref().unwrap())))
+        .collect::<Vec<ListItem>>();
 
     let default_title = "Entries".to_string();
 
@@ -366,10 +335,12 @@ where
         .unwrap_or_else(|| &default_title);
 
     let entries_titles = List::new(entries).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(&title)
-            .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD)),
+        Block::default().borders(Borders::ALL).title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
     );
 
     let entries_titles = match app.selected {
@@ -377,7 +348,7 @@ where
             .highlight_style(
                 Style::default()
                     .fg(Color::Rgb(255, 150, 167))
-                    .modifier(Modifier::BOLD),
+                    .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> "),
         _ => entries_titles,
@@ -399,23 +370,25 @@ where
                             let mut s = String::with_capacity(line.len() + 1);
                             s.push_str(line);
                             s.push_str("\n");
-                            Text::raw(s)
+                            Span::raw(s)
                         })
                         .collect::<Vec<_>>();
-                    e.push(Text::raw("\n"));
+                    e.push(Span::raw("\n"));
                     e
                 })
                 .collect::<Vec<_>>();
 
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .title("Error - press 'q' to close")
-                .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+            let block = Block::default().borders(Borders::ALL).title(Span::styled(
+                "Error - press 'q' to close",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ));
 
-            let error_widget = Paragraph::new(error_text.iter())
+            let error_widget = Paragraph::new(Spans::from(error_text))
                 .block(block)
-                .wrap(true)
-                .scroll(0);
+                .wrap(Wrap { trim: false })
+                .scroll((0, 0));
 
             f.render_stateful_widget(entries_titles, chunks[0], &mut app.entries.state);
             f.render_widget(error_widget, chunks[1]);
@@ -429,7 +402,7 @@ fn draw_entry<B>(
     f: &mut Frame<B>,
     area: Rect,
     scroll: u16,
-    current_entry_text: &[Text],
+    current_entry_text: &str,
     entry_title: &str,
     error_flash: &[crate::error::Error],
     feed_title: &str,
@@ -441,14 +414,17 @@ fn draw_entry<B>(
     title.push_str(" - ");
     title.push_str(feed_title);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(&title)
-        .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
-    let paragraph = Paragraph::new(text.iter())
+    let block = Block::default().borders(Borders::ALL).title(Span::styled(
+        &title,
+        Style::default()
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Cyan),
+    ));
+
+    let paragraph = Paragraph::new(text)
         .block(block)
-        .wrap(true)
-        .scroll(scroll);
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
 
     if !error_flash.is_empty() {
         let chunks = Layout::default()
@@ -467,23 +443,25 @@ fn draw_entry<B>(
                             let mut s = String::with_capacity(line.len() + 1);
                             s.push_str(line);
                             s.push_str("\n");
-                            Text::raw(s)
+                            Span::from(s)
                         })
                         .collect::<Vec<_>>();
-                    e.push(Text::raw("\n"));
+                    e.push(Span::raw("\n"));
                     e
                 })
                 .collect::<Vec<_>>();
 
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .title("Error - press 'q' to close")
-                .title_style(Style::default().fg(Color::Cyan).modifier(Modifier::BOLD));
+            let block = Block::default().borders(Borders::ALL).title(Span::styled(
+                "Error - press 'q' to close",
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Cyan),
+            ));
 
-            let error_widget = Paragraph::new(error_text.iter())
+            let error_widget = Paragraph::new(Spans::from(error_text))
                 .block(block)
-                .wrap(true)
-                .scroll(0);
+                .wrap(Wrap { trim: false })
+                .scroll((0, 0));
 
             f.render_widget(paragraph, chunks[0]);
             f.render_widget(error_widget, chunks[1]);

@@ -3,7 +3,7 @@ use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
 
 #[derive(Debug)]
-pub struct App<'app> {
+pub struct App {
     // database stuff
     pub conn: rusqlite::Connection,
     // feed stuff
@@ -14,7 +14,7 @@ pub struct App<'app> {
     pub entries: util::StatefulList<crate::rss::Entry>,
     pub line_length: usize,
     pub entry_selection_position: usize,
-    pub current_entry_text: Vec<tui::widgets::Text<'app>>,
+    pub current_entry_text: String,
     pub entry_scroll_position: u16,
     // modes
     pub should_quit: bool,
@@ -27,8 +27,8 @@ pub struct App<'app> {
     pub flash: Option<String>,
 }
 
-impl<'app> App<'app> {
-    pub fn new(options: crate::Options) -> Result<App<'app>, Error> {
+impl App {
+    pub fn new(options: crate::Options) -> Result<App, Error> {
         let conn = rusqlite::Connection::open(&options.database_path)?;
         crate::rss::initialize_db(&conn)?;
         let initial_feed_titles = vec![].into();
@@ -46,7 +46,7 @@ impl<'app> App<'app> {
             selected,
             entry_scroll_position: 0,
             current_entry: None,
-            current_entry_text: vec![],
+            current_entry_text: String::new(),
             current_feed: initial_current_feed,
             feed_subscription_input: String::new(),
             mode: Mode::Normal,
@@ -210,7 +210,7 @@ impl<'app> App<'app> {
             Selected::Entry(_) => {
                 self.entry_scroll_position = 0;
                 self.selected = {
-                    self.current_entry_text = vec![];
+                    self.current_entry_text = String::new();
                     Selected::Entries
                 }
             }
@@ -240,21 +240,9 @@ impl<'app> App<'app> {
 
                         if let Some(html) = entry_html {
                             let text = html2text::from_read(html.as_bytes(), self.line_length);
-
-                            let text = text
-                                .split('\n')
-                                .map(|line| {
-                                    tui::widgets::Text::raw({
-                                        let mut owned = line.to_owned();
-                                        owned.push_str("\n");
-                                        owned
-                                    })
-                                })
-                                .collect::<Vec<_>>();
-
                             self.current_entry_text = text;
                         } else {
-                            self.current_entry_text = vec![];
+                            self.current_entry_text = String::new();
                         }
 
                         self.selected = Selected::Entry(entry.clone());
