@@ -13,11 +13,11 @@ crossterm = "0.17.7"
 diligent-date-parser = "0.1.2"
 html2text = "0.2.0"
 r2d2 = "0.8.9"
-r2d2_sqlite = "0.16.0"
+r2d2_sqlite = "0.17.0"
 rayon = "1.4.0"
 reqwest = { version = "0.10.8", features = ["blocking"] }
 rss = { git = "https://github.com/rust-syndication/rss", rev = "2a975b0" }
-rusqlite = { version = "0.23", features = ["chrono"] }
+rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3.17"
 tui = { version = "0.10.0", default-features = false, features = ["crossterm"] }
 
