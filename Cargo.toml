@@ -24,4 +24,3 @@ tui = { version = "0.10", default-features = false, features = ["crossterm"] }
 [profile.release]
 codegen-units = 1
 lto = true
-opt-level = 3
