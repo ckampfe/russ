@@ -19,7 +19,7 @@ reqwest = { version = "0.10", features = ["blocking"] }
 rss = { git = "https://github.com/rust-syndication/rss", rev = "2a975b0" }
 rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3"
-tui = { version = "0.10", default-features = false, features = ["crossterm"] }
+tui = { version = "0.11", default-features = false, features = ["crossterm"] }
 
 [profile.release]
 codegen-units = 1
