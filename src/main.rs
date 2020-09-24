@@ -10,7 +10,7 @@ use std::{
     error::Error,
     io::{stdout, Write},
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::mpsc,
     thread, time,
 };
 use structopt::*;
@@ -61,7 +61,7 @@ enum IOCommand {
 }
 
 fn start_async_io(
-    app: Arc<Mutex<App>>,
+    app: App,
     sx: &mpsc::Sender<IOCommand>,
     rx: mpsc::Receiver<IOCommand>,
     options: &Options,
@@ -77,23 +77,16 @@ fn start_async_io(
             RefreshFeed(feed_id) => {
                 let now = std::time::Instant::now();
 
-                {
-                    let mut app = app.lock().unwrap();
-                    app.flash = Some("Refreshing feed...".to_string());
-                }
+                app.set_flash("Refreshing feed...".to_string());
 
                 let conn = pool.get()?;
 
                 if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
-                    let mut app = app.lock().unwrap();
-                    app.error_flash.push(e);
+                    app.push_error_flash(e);
                 } else {
-                    {
-                        let mut app = app.lock().unwrap();
-                        app.update_current_feed_and_entries()?;
-                        let elapsed = now.elapsed();
-                        app.flash = Some(format!("Refreshed feed in {:?}", elapsed));
-                    }
+                    app.update_current_feed_and_entries()?;
+                    let elapsed = now.elapsed();
+                    app.set_flash(format!("Refreshed feed in {:?}", elapsed));
 
                     clear_flash_after(&sx, &options.flash_display_duration_seconds);
                 };
@@ -101,32 +94,26 @@ fn start_async_io(
             RefreshAllFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
 
-                {
-                    let mut app = app.lock().unwrap();
-                    app.flash = Some("Refreshing all feeds...".to_string());
-                }
+                app.set_flash("Refreshing all feeds...".to_string());
 
                 feed_ids
                     .into_par_iter()
                     .for_each(|feed_id| match pool.get() {
                         Ok(conn) => {
                             if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
-                                let mut app = app.lock().unwrap();
-                                app.error_flash.push(e);
+                                app.push_error_flash(e.into());
                             }
                         }
                         Err(e) => {
-                            let mut app = app.lock().unwrap();
-                            app.error_flash.push(e.into());
+                            app.push_error_flash(e.into());
                         }
                     });
 
                 {
-                    let mut app = app.lock().unwrap();
                     app.update_current_feed_and_entries()?;
 
                     let elapsed = now.elapsed();
-                    app.flash = Some(format!("Refreshed all feeds in {:?}", elapsed));
+                    app.set_flash(format!("Refreshed all feeds in {:?}", elapsed));
                 }
 
                 clear_flash_after(&sx, &options.flash_display_duration_seconds);
@@ -134,43 +121,36 @@ fn start_async_io(
             SubscribeToFeed(feed_subscription_input) => {
                 let now = std::time::Instant::now();
 
-                {
-                    let mut app = app.lock().unwrap();
-                    app.flash = Some("Subscribing to feed...".to_string());
-                }
+                app.set_flash("Subscribing to feed...".to_string());
 
                 let conn = pool.get()?;
 
                 if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
-                    let mut app = app.lock().unwrap();
-                    app.error_flash.push(e);
+                    app.push_error_flash(e);
                 } else {
                     match crate::rss::get_feeds(&conn) {
                         Ok(l) => {
                             let feeds = l.into();
                             {
-                                let mut app = app.lock().unwrap();
-                                app.feed_subscription_input = String::new();
-                                app.feeds = feeds;
+                                app.set_feed_subscription_input(String::new());
+                                app.set_feeds(feeds);
                                 app.select_feeds();
                                 app.update_current_feed_and_entries()?;
 
                                 let elapsed = now.elapsed();
-                                app.flash = Some(format!("Subscribed in {:?}", elapsed));
+                                app.set_flash(format!("Subscribed in {:?}", elapsed));
                             }
 
                             clear_flash_after(&sx, &options.flash_display_duration_seconds);
                         }
                         Err(e) => {
-                            let mut app = app.lock().unwrap();
-                            app.error_flash.push(e);
+                            app.push_error_flash(e);
                         }
                     };
                 }
             }
             ClearFlash => {
-                let mut app = app.lock().unwrap();
-                app.flash = None;
+                app.clear_flash();
             }
         }
     }
@@ -222,9 +202,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let options_clone = options.clone();
 
-    let app = Arc::new(Mutex::new(App::new(options)?));
+    let app = App::new(options)?;
 
-    let cloned_app = Arc::clone(&app);
+    let mut cloned_app = app.clone();
 
     terminal.clear()?;
 
@@ -241,19 +221,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     // MAIN THREAD IS DRAW THREAD
     loop {
         let mode = {
-            let mut app = cloned_app.lock().unwrap();
-            terminal.draw(|mut f| ui::draw(&mut f, &mut app))?;
-            app.mode
+            cloned_app.draw(&mut terminal)?;
+            cloned_app.mode()
         };
+
         match mode {
             Mode::Normal => match rx.recv()? {
                 Event::Input(event) => match (event.code, event.modifiers) {
                     (KeyCode::Char('q'), _)
                     | (KeyCode::Char('c'), KeyModifiers::CONTROL)
                     | (KeyCode::Esc, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        if !app.error_flash.is_empty() {
-                            app.error_flash = vec![];
+                        if !cloned_app.error_flash_is_empty() {
+                            cloned_app.clear_error_flash();
                         } else {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -262,54 +241,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                             break;
                         }
                     }
-                    (KeyCode::Char('r'), KeyModifiers::NONE) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        match &app.selected {
-                            Selected::Feeds => {
-                                let feed_id = {
-                                    let selected_idx = app.feeds.state.selected().unwrap();
-                                    app.feeds.items[selected_idx].id
-                                };
-                                io_s.send(IOCommand::RefreshFeed(feed_id))?;
-                            }
-                            _ => app.toggle_read()?,
+                    (KeyCode::Char('r'), KeyModifiers::NONE) => match &cloned_app.selected() {
+                        Selected::Feeds => {
+                            let feed_id = cloned_app.selected_feed_id();
+                            io_s.send(IOCommand::RefreshFeed(feed_id))?;
                         }
-                    }
+                        _ => cloned_app.toggle_read()?,
+                    },
                     (KeyCode::Char('x'), KeyModifiers::NONE) => {
-                        let feed_ids = {
-                            let app = cloned_app.lock().unwrap();
-                            crate::rss::get_feeds(&app.conn)?
-                                .iter()
-                                .map(|feed| feed.id)
-                                .collect::<Vec<_>>()
-                        };
+                        let feed_ids = cloned_app.feed_ids()?;
 
                         io_s.send(IOCommand::RefreshAllFeeds(feed_ids))?;
                     }
-                    (KeyCode::Char(c), KeyModifiers::NONE) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_key(c)
-                    }
-                    (KeyCode::Left, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_left()?
-                    }
-                    (KeyCode::Up, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_up()?
-                    }
-                    (KeyCode::Right, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_right()?
-                    }
-                    (KeyCode::Down, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_down()?
-                    }
-                    (KeyCode::Enter, _) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.on_enter()?
-                    }
+                    (KeyCode::Char(c), KeyModifiers::NONE) => cloned_app.on_key(c),
+                    (KeyCode::Left, _) => cloned_app.on_left()?,
+                    (KeyCode::Up, _) => cloned_app.on_up()?,
+                    (KeyCode::Right, _) => cloned_app.on_right()?,
+                    (KeyCode::Down, _) => cloned_app.on_down()?,
+                    (KeyCode::Enter, _) => cloned_app.on_enter()?,
                     _ => {}
                 },
                 Event::Tick => (),
@@ -317,23 +266,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             Mode::Editing => match rx.recv()? {
                 Event::Input(event) => match event.code {
                     KeyCode::Enter => {
-                        let feed_subscription_input = {
-                            let app = cloned_app.lock().unwrap();
-                            app.feed_subscription_input.clone()
-                        };
+                        let feed_subscription_input = { cloned_app.feed_subscription_input() };
                         io_s.send(IOCommand::SubscribeToFeed(feed_subscription_input))?;
                     }
                     KeyCode::Char(c) => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.feed_subscription_input.push(c);
+                        cloned_app.push_feed_subscription_input(c);
                     }
-                    KeyCode::Backspace => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.feed_subscription_input.pop();
-                    }
+                    KeyCode::Backspace => cloned_app.pop_feed_subscription_input(),
                     KeyCode::Esc => {
-                        let mut app = cloned_app.lock().unwrap();
-                        app.mode = Mode::Normal;
+                        cloned_app.set_mode(Mode::Normal);
                     }
                     _ => {}
                 },

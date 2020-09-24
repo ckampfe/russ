@@ -7,11 +7,11 @@ use tui::{
     Frame,
 };
 
-use crate::app::App;
+use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::rss::Entry;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
     let chunks = Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .direction(Direction::Horizontal)
@@ -51,7 +51,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     }
 }
 
-fn draw_info_column<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_info_column<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
@@ -155,7 +155,7 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_feeds<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_feeds<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
@@ -194,7 +194,7 @@ where
     f.render_stateful_widget(feeds, area, &mut app.feeds.state);
 }
 
-fn draw_feed_info<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_feed_info<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
@@ -277,7 +277,7 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_help<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_help<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
@@ -296,7 +296,7 @@ where
     f.render_widget(help_message, area);
 }
 
-fn draw_new_feed_input<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_new_feed_input<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
@@ -315,7 +315,7 @@ where
     f.render_widget(input, area);
 }
 
-fn draw_entries<B>(f: &mut Frame<B>, area: Rect, app: &mut App)
+fn draw_entries<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
