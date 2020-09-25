@@ -285,20 +285,20 @@ impl App {
     }
 
     pub fn toggle_read(&mut self) -> Result<(), Error> {
-        let selected = self.inner.lock().unwrap().selected.clone();
+        let selected = &self.inner.lock().unwrap().selected;
 
         {
             let mut inner = self.inner.lock().unwrap();
             match selected {
                 Selected::Entry(entry) => {
+                    inner.selected = Selected::Entries;
+                    inner.entry_scroll_position = 0;
                     entry.toggle_read(&inner.conn)?;
                     inner.update_current_entries()?;
                     if let Some(entry) = inner.get_selected_entry() {
                         let entry = entry?;
                         inner.current_entry = Some(entry);
                     }
-                    inner.selected = Selected::Entries;
-                    inner.entry_scroll_position = 0;
                 }
                 Selected::Entries => {
                     if let Some(entry) = &inner.current_entry {
