@@ -28,40 +28,20 @@ impl App {
         self.inner.lock().unwrap().mode
     }
 
-    pub fn on_key(&self, c: char) {
-        let mut inner = self.inner.lock().unwrap();
-
+    pub fn on_key(&self, c: char) -> Result<(), Error> {
         match c {
             // vim-style movement
-            'h' => {
-                if let Err(e) = self.on_left() {
-                    inner.error_flash.push(e);
-                }
-            }
-            'j' => {
-                if let Err(e) = self.on_down() {
-                    inner.error_flash.push(e);
-                }
-            }
-            'k' => {
-                if let Err(e) = self.on_up() {
-                    inner.error_flash.push(e);
-                }
-            }
-            'l' => {
-                if let Err(e) = self.on_right() {
-                    inner.error_flash.push(e);
-                }
-            }
-            'a' => {
-                if let Err(e) = self.toggle_read_mode() {
-                    inner.error_flash.push(e);
-                }
-            }
+            'h' => self.on_left(),
+            'j' => self.on_down(),
+            'k' => self.on_up(),
+            'l' => self.on_right(),
+            'a' => self.toggle_read_mode(),
             'e' | 'i' => {
+                let mut inner = self.inner.lock().unwrap();
                 inner.mode = Mode::Editing;
+                Ok(())
             }
-            _ => (),
+            _ => Ok(()),
         }
     }
 
@@ -171,9 +151,11 @@ impl App {
 
         match (&inner.read_mode, &inner.selected) {
             (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
+                inner.entry_selection_position = 0;
                 inner.read_mode = ReadMode::ShowUnread
             }
             (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
+                inner.entry_selection_position = 0;
                 inner.read_mode = ReadMode::ShowRead
             }
             _ => (),
@@ -285,14 +267,23 @@ impl App {
     }
 
     pub fn toggle_read(&mut self) -> Result<(), Error> {
-        let selected = &self.inner.lock().unwrap().selected;
+        let mut inner = self.inner.lock().unwrap();
+        let selected = inner.selected.clone();
+        match selected {
+            Selected::Entry(entry) => {
+                entry.toggle_read(&inner.conn)?;
+                inner.selected = Selected::Entries;
+                inner.update_current_entries()?;
 
-        {
-            let mut inner = self.inner.lock().unwrap();
-            match selected {
-                Selected::Entry(entry) => {
-                    inner.selected = Selected::Entries;
-                    inner.entry_scroll_position = 0;
+                if let Some(entry) = inner.get_selected_entry() {
+                    let entry = entry?;
+                    inner.current_entry = Some(entry);
+                }
+
+                inner.entry_scroll_position = 0;
+            }
+            Selected::Entries => {
+                if let Some(entry) = &inner.current_entry {
                     entry.toggle_read(&inner.conn)?;
                     inner.update_current_entries()?;
                     if let Some(entry) = inner.get_selected_entry() {
@@ -300,18 +291,8 @@ impl App {
                         inner.current_entry = Some(entry);
                     }
                 }
-                Selected::Entries => {
-                    if let Some(entry) = &inner.current_entry {
-                        entry.toggle_read(&inner.conn)?;
-                        inner.update_current_entries()?;
-                        if let Some(entry) = inner.get_selected_entry() {
-                            let entry = entry?;
-                            inner.current_entry = Some(entry);
-                        }
-                    }
-                }
-                Selected::Feeds => (),
             }
+            Selected::Feeds => (),
         }
 
         Ok(())

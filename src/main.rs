@@ -101,7 +101,7 @@ fn start_async_io(
                     .for_each(|feed_id| match pool.get() {
                         Ok(conn) => {
                             if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
-                                app.push_error_flash(e.into());
+                                app.push_error_flash(e);
                             }
                         }
                         Err(e) => {
@@ -129,8 +129,7 @@ fn start_async_io(
                     app.push_error_flash(e);
                 } else {
                     match crate::rss::get_feeds(&conn) {
-                        Ok(l) => {
-                            let feeds = l.into();
+                        Ok(feeds) => {
                             {
                                 app.set_feed_subscription_input(String::new());
                                 app.set_feeds(feeds);
@@ -202,9 +201,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let options_clone = options.clone();
 
-    let app = App::new(options)?;
+    let mut app = App::new(options)?;
 
-    let mut cloned_app = app.clone();
+    let cloned_app = app.clone();
 
     terminal.clear()?;
 
@@ -214,15 +213,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // this thread is for async IO
     let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {
-        start_async_io(app, &io_s_clone, io_r, &options_clone)?;
+        start_async_io(cloned_app, &io_s_clone, io_r, &options_clone)?;
         Ok(())
     });
 
     // MAIN THREAD IS DRAW THREAD
     loop {
         let mode = {
-            cloned_app.draw(&mut terminal)?;
-            cloned_app.mode()
+            app.draw(&mut terminal)?;
+            app.mode()
         };
 
         match mode {
@@ -231,8 +230,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     (KeyCode::Char('q'), _)
                     | (KeyCode::Char('c'), KeyModifiers::CONTROL)
                     | (KeyCode::Esc, _) => {
-                        if !cloned_app.error_flash_is_empty() {
-                            cloned_app.clear_error_flash();
+                        if !app.error_flash_is_empty() {
+                            app.clear_error_flash();
                         } else {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -241,24 +240,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                             break;
                         }
                     }
-                    (KeyCode::Char('r'), KeyModifiers::NONE) => match &cloned_app.selected() {
+                    (KeyCode::Char('r'), KeyModifiers::NONE) => match &app.selected() {
                         Selected::Feeds => {
-                            let feed_id = cloned_app.selected_feed_id();
+                            let feed_id = app.selected_feed_id();
                             io_s.send(IOCommand::RefreshFeed(feed_id))?;
                         }
-                        _ => cloned_app.toggle_read()?,
+                        _ => app.toggle_read()?,
                     },
                     (KeyCode::Char('x'), KeyModifiers::NONE) => {
-                        let feed_ids = cloned_app.feed_ids()?;
+                        let feed_ids = app.feed_ids()?;
 
                         io_s.send(IOCommand::RefreshAllFeeds(feed_ids))?;
                     }
-                    (KeyCode::Char(c), KeyModifiers::NONE) => cloned_app.on_key(c),
-                    (KeyCode::Left, _) => cloned_app.on_left()?,
-                    (KeyCode::Up, _) => cloned_app.on_up()?,
-                    (KeyCode::Right, _) => cloned_app.on_right()?,
-                    (KeyCode::Down, _) => cloned_app.on_down()?,
-                    (KeyCode::Enter, _) => cloned_app.on_enter()?,
+                    (KeyCode::Char(c), KeyModifiers::NONE) => app.on_key(c)?,
+                    (KeyCode::Left, _) => app.on_left()?,
+                    (KeyCode::Up, _) => app.on_up()?,
+                    (KeyCode::Right, _) => app.on_right()?,
+                    (KeyCode::Down, _) => app.on_down()?,
+                    (KeyCode::Enter, _) => app.on_enter()?,
                     _ => {}
                 },
                 Event::Tick => (),
@@ -266,15 +265,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             Mode::Editing => match rx.recv()? {
                 Event::Input(event) => match event.code {
                     KeyCode::Enter => {
-                        let feed_subscription_input = { cloned_app.feed_subscription_input() };
+                        let feed_subscription_input = { app.feed_subscription_input() };
                         io_s.send(IOCommand::SubscribeToFeed(feed_subscription_input))?;
                     }
                     KeyCode::Char(c) => {
-                        cloned_app.push_feed_subscription_input(c);
+                        app.push_feed_subscription_input(c);
                     }
-                    KeyCode::Backspace => cloned_app.pop_feed_subscription_input(),
+                    KeyCode::Backspace => app.pop_feed_subscription_input(),
                     KeyCode::Esc => {
-                        cloned_app.set_mode(Mode::Normal);
+                        app.set_mode(Mode::Normal);
                     }
                     _ => {}
                 },
