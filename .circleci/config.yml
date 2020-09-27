@@ -7,6 +7,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install system deps
+          command: sudo apt-get update && sudo apt-get install xcb-shape xcb-fixes
+      - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
