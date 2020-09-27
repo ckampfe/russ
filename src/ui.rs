@@ -283,8 +283,14 @@ where
 {
     let mut text = String::new();
     match app.selected {
-        Selected::Feeds => text.push_str("r - refresh selected feed; x - refresh all feeds\n"),
-        _ => text.push_str("r - mark entry read/un; a - toggle view read/un\n"),
+        Selected::Feeds => {
+            text.push_str("r - refresh selected feed; x - refresh all feeds\n");
+            text.push_str("c - copy link\n")
+        }
+        _ => {
+            text.push_str("r - mark entry read/un; a - toggle view read/un\n");
+            text.push_str("c - copy link\n")
+        }
     }
     match app.mode {
         Mode::Normal => text.push_str("i - edit mode; q - exit"),

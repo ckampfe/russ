@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     AtomError(atom::Error),
+    ClipboardSetError(ClipboardSetError),
     DatabaseConnectionPoolError(r2d2::Error),
     DatabaseError(rusqlite::Error),
     FeedKindError(String),
@@ -60,5 +61,22 @@ impl From<rss::Error> for Error {
 impl From<Box<dyn std::any::Any + Send + 'static>> for Error {
     fn from(error: Box<dyn std::any::Any + Send + 'static>) -> Error {
         Error::ThreadJoinError(format!("{:?}", error))
+    }
+}
+
+impl From<ClipboardSetError> for Error {
+    fn from(error: ClipboardSetError) -> Error {
+        Error::ClipboardSetError(error)
+    }
+}
+
+#[derive(Debug)]
+pub struct ClipboardSetError;
+
+impl std::error::Error for ClipboardSetError {}
+
+impl fmt::Display for ClipboardSetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

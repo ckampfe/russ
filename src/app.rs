@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
+use copypasta::{ClipboardContext, ClipboardProvider};
 use std::sync::{Arc, Mutex};
 use tui::{backend::CrosstermBackend, Terminal};
 
@@ -41,6 +42,7 @@ impl App {
                 inner.mode = Mode::Editing;
                 Ok(())
             }
+            'c' => self.put_current_link_in_clipboard(),
             _ => Ok(()),
         }
     }
@@ -144,6 +146,32 @@ impl App {
     pub fn on_enter(&self) -> Result<(), Error> {
         let mut inner = self.inner.lock().unwrap();
         inner.on_enter()
+    }
+
+    fn put_current_link_in_clipboard(&self) -> Result<(), Error> {
+        let mut ctx = ClipboardContext::new().unwrap();
+
+        let inner = self.inner.lock().unwrap();
+
+        let clipboard_result = match &inner.selected {
+            Selected::Feeds => {
+                let feed = inner.current_feed.clone().unwrap();
+                let link = feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap());
+                ctx.set_contents(link)
+            }
+            Selected::Entries => {
+                let idx = inner.entry_selection_position;
+                let entry = &inner.entries.items[idx];
+                let link = entry.link.clone().unwrap_or_else(|| "".to_string());
+                ctx.set_contents(link)
+            }
+            Selected::Entry(e) => {
+                let link = e.link.clone().unwrap_or_else(|| "".to_string());
+                ctx.set_contents(link)
+            }
+        };
+
+        clipboard_result.map_err(|_e| crate::error::ClipboardSetError.into())
     }
 
     pub fn toggle_read_mode(&self) -> Result<(), Error> {
@@ -425,34 +453,6 @@ impl AppImpl {
             None
         }
     }
-
-    // pub fn toggle_read(&mut self) -> Result<(), Error> {
-    //     match &self.selected {
-    //         Selected::Entry(entry) => {
-    //             entry.toggle_read(&self.conn)?;
-    //             self.update_current_entries()?;
-    //             if let Some(entry) = self.get_selected_entry() {
-    //                 let entry = entry?;
-    //                 self.current_entry = Some(entry);
-    //             }
-    //             self.selected = Selected::Entries;
-    //             self.entry_scroll_position = 0;
-    //         }
-    //         Selected::Entries => {
-    //             if let Some(entry) = &self.current_entry {
-    //                 entry.toggle_read(&self.conn)?;
-    //                 self.update_current_entries()?;
-    //                 if let Some(entry) = self.get_selected_entry() {
-    //                     let entry = entry?;
-    //                     self.current_entry = Some(entry);
-    //                 }
-    //             }
-    //         }
-    //         Selected::Feeds => (),
-    //     }
-
-    //     Ok(())
-    // }
 
     pub fn on_enter(&mut self) -> Result<(), Error> {
         match self.selected {

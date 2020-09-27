@@ -32,7 +32,7 @@ The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `Esc`, an
 
 To subscribe to your first feed, you will need to be in `insert` mode.
 Press `i` to enter `insert` mode, where you can type the URL of and RSS or Atom feed you want to subscribe to.
-Press  `Enter` to subscribe to a feed and fetch all entries.
+Press `Enter` to subscribe to a feed and fetch all entries.
 If this operation is successful, title of the feed will appear in the left column, and its unread entries on the right.
 Press `Esc` to exit `insert` mode and return to `normal` mode.
 This is how you subscribe to RSS/Atom feeds in Russ.
@@ -146,6 +146,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [ ] some kind of search
 - [x] fix N+1 queries on feed/entry creation
 - [x] set up CI
+- [x] copy feed and entry links to clipboard
 
 ## license
 
