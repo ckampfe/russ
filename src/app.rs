@@ -130,7 +130,10 @@ impl App {
 
         match inner.selected {
             Selected::Feeds => (),
-            Selected::Entries => inner.selected = Selected::Feeds,
+            Selected::Entries => {
+                inner.entry_selection_position = 0;
+                inner.selected = Selected::Feeds
+            }
             Selected::Entry(_) => {
                 inner.entry_scroll_position = 0;
                 inner.selected = {
