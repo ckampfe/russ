@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use crate::modes::*;
 use app::App;
 use crossterm::{
