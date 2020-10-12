@@ -328,12 +328,18 @@ impl App {
 
         Ok(())
     }
+
+    pub fn http_client(&self) -> reqwest::blocking::Client {
+        self.inner.lock().unwrap().http_client.clone()
+    }
 }
 
 #[derive(Debug)]
 pub struct AppImpl {
     // database stuff
     pub conn: rusqlite::Connection,
+    // network stuff
+    pub http_client: reqwest::blocking::Client,
     // feed stuff
     pub current_feed: Option<crate::rss::Feed>,
     pub feeds: util::StatefulList<crate::rss::Feed>,
@@ -358,6 +364,10 @@ pub struct AppImpl {
 impl AppImpl {
     pub fn new(options: crate::Options) -> Result<AppImpl, Error> {
         let conn = rusqlite::Connection::open(&options.database_path)?;
+        let http_client = reqwest::blocking::ClientBuilder::default()
+            .timeout(options.network_timeout)
+            .build()?;
+
         crate::rss::initialize_db(&conn)?;
         let initial_feed_titles = vec![].into();
         let selected = Selected::Feeds;
@@ -366,6 +376,7 @@ impl AppImpl {
 
         let mut app = AppImpl {
             conn,
+            http_client,
             line_length: options.line_length,
             should_quit: false,
             error_flash: vec![],

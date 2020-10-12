@@ -47,6 +47,9 @@ pub struct Options {
     /// number of seconds to show the flash message before clearing it
     #[structopt(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
     flash_display_duration_seconds: time::Duration,
+    /// RSS/Atom network request timeout in seconds
+    #[structopt(short, long, default_value = "5", parse(try_from_str = parse_seconds))]
+    network_timeout: time::Duration,
 }
 
 fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
@@ -83,7 +86,7 @@ fn start_async_io(
 
                 let conn = pool.get()?;
 
-                if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
+                if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id) {
                     app.push_error_flash(e);
                 } else {
                     app.update_current_feed_and_entries()?;
@@ -102,7 +105,9 @@ fn start_async_io(
                     .into_par_iter()
                     .for_each(|feed_id| match pool.get() {
                         Ok(conn) => {
-                            if let Err(e) = crate::rss::refresh_feed(&conn, feed_id) {
+                            if let Err(e) =
+                                crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
+                            {
                                 app.push_error_flash(e);
                             }
                         }
@@ -127,7 +132,11 @@ fn start_async_io(
 
                 let conn = pool.get()?;
 
-                if let Err(e) = crate::rss::subscribe_to_feed(&conn, &feed_subscription_input) {
+                if let Err(e) = crate::rss::subscribe_to_feed(
+                    &app.http_client(),
+                    &conn,
+                    &feed_subscription_input,
+                ) {
                     app.push_error_flash(e);
                 } else {
                     match crate::rss::get_feeds(&conn) {
