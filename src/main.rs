@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 use crate::modes::*;
+use anyhow::{Context, Result};
 use app::App;
 use crossterm::{
     event::{self, Event as CEvent, KeyCode, KeyModifiers},
@@ -9,7 +10,6 @@ use crossterm::{
 };
 use rayon::prelude::*;
 use std::{
-    error::Error,
     io::{stdout, Write},
     path::PathBuf,
     sync::mpsc,
@@ -19,7 +19,6 @@ use structopt::*;
 use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
-mod error;
 mod modes;
 mod rss;
 mod ui;
@@ -70,7 +69,7 @@ fn start_async_io(
     sx: &mpsc::Sender<IOCommand>,
     rx: mpsc::Receiver<IOCommand>,
     options: &Options,
-) -> Result<(), crate::error::Error> {
+) -> Result<()> {
     use IOCommand::*;
 
     let manager = r2d2_sqlite::SqliteConnectionManager::file(&options.database_path);
@@ -86,7 +85,13 @@ fn start_async_io(
 
                 let conn = pool.get()?;
 
-                if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id) {
+                if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
+                    .with_context(|| {
+                        let feed_url = crate::rss::get_feed_url(&conn, feed_id).unwrap();
+
+                        format!("Failed to fetch and refresh feed {}", feed_url)
+                    })
+                {
                     app.push_error_flash(e);
                 } else {
                     app.update_current_feed_and_entries()?;
@@ -107,6 +112,12 @@ fn start_async_io(
                         Ok(conn) => {
                             if let Err(e) =
                                 crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
+                                    .with_context(|| {
+                                        let feed_url =
+                                            crate::rss::get_feed_url(&conn, feed_id).unwrap();
+
+                                        format!("Failed to fetch and refresh feed {}", feed_url)
+                                    })
                             {
                                 app.push_error_flash(e);
                             }
@@ -177,7 +188,7 @@ fn clear_flash_after(sx: &mpsc::Sender<IOCommand>, duration: &time::Duration) {
     });
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let options: Options = Options::from_args();
 
     enable_raw_mode()?;
@@ -223,7 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let io_s_clone = io_s.clone();
 
     // this thread is for async IO
-    let io_thread = thread::spawn(move || -> Result<(), crate::error::Error> {
+    let io_thread = thread::spawn(move || -> Result<()> {
         start_async_io(cloned_app, &io_s_clone, io_r, &options_clone)?;
         Ok(())
     });

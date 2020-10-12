@@ -1,6 +1,6 @@
-use crate::error::Error;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
+use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::sync::{Arc, Mutex};
 use tui::{backend::CrosstermBackend, Terminal};
@@ -11,7 +11,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(options: crate::Options) -> Result<App, Error> {
+    pub fn new(options: crate::Options) -> Result<App> {
         Ok(App {
             inner: Arc::new(Mutex::new(AppImpl::new(options)?)),
         })
@@ -29,7 +29,7 @@ impl App {
         self.inner.lock().unwrap().mode
     }
 
-    pub fn on_key(&self, c: char) -> Result<(), Error> {
+    pub fn on_key(&self, c: char) -> Result<()> {
         match c {
             // vim-style movement
             'h' => self.on_left(),
@@ -47,7 +47,7 @@ impl App {
         }
     }
 
-    pub fn on_up(&self) -> Result<(), Error> {
+    pub fn on_up(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
 
         match inner.selected {
@@ -75,7 +75,7 @@ impl App {
         Ok(())
     }
 
-    pub fn on_down(&self) -> Result<(), Error> {
+    pub fn on_down(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
 
         match inner.selected {
@@ -103,7 +103,7 @@ impl App {
         Ok(())
     }
 
-    pub fn on_right(&self) -> Result<(), Error> {
+    pub fn on_right(&self) -> Result<()> {
         let selected = self.inner.lock().unwrap().selected.clone();
 
         let mut inner = self.inner.lock().unwrap();
@@ -125,7 +125,7 @@ impl App {
         }
     }
 
-    pub fn on_left(&self) -> Result<(), Error> {
+    pub fn on_left(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
 
         match inner.selected {
@@ -146,12 +146,12 @@ impl App {
         Ok(())
     }
 
-    pub fn on_enter(&self) -> Result<(), Error> {
+    pub fn on_enter(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.on_enter()
     }
 
-    fn put_current_link_in_clipboard(&self) -> Result<(), Error> {
+    fn put_current_link_in_clipboard(&self) -> Result<()> {
         let mut ctx = ClipboardContext::new().unwrap();
 
         let inner = self.inner.lock().unwrap();
@@ -174,10 +174,10 @@ impl App {
             }
         };
 
-        clipboard_result.map_err(|_e| crate::error::ClipboardSetError.into())
+        clipboard_result.map_err(|e| anyhow::anyhow!(e))
     }
 
-    pub fn toggle_read_mode(&self) -> Result<(), Error> {
+    pub fn toggle_read_mode(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
 
         match (&inner.read_mode, &inner.selected) {
@@ -222,7 +222,7 @@ impl App {
         inner.error_flash.is_empty()
     }
 
-    pub fn push_error_flash(&self, e: crate::error::Error) {
+    pub fn push_error_flash(&self, e: anyhow::Error) {
         let mut inner = self.inner.lock().unwrap();
         inner.error_flash.push(e);
     }
@@ -263,7 +263,7 @@ impl App {
         inner.feeds = feeds;
     }
 
-    pub fn update_current_feed_and_entries(&self) -> Result<(), Error> {
+    pub fn update_current_feed_and_entries(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.update_current_feed()?;
         inner.update_current_entries()?;
@@ -286,7 +286,7 @@ impl App {
         feeds.items[selected_idx].id
     }
 
-    pub fn feed_ids(&self) -> Result<Vec<crate::rss::FeedId>, crate::error::Error> {
+    pub fn feed_ids(&self) -> Result<Vec<crate::rss::FeedId>> {
         let inner = self.inner.lock().unwrap();
 
         let ids = crate::rss::get_feeds(&inner.conn)?
@@ -297,7 +297,7 @@ impl App {
         Ok(ids)
     }
 
-    pub fn toggle_read(&mut self) -> Result<(), Error> {
+    pub fn toggle_read(&mut self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         let selected = inner.selected.clone();
         match selected {
@@ -356,13 +356,13 @@ pub struct AppImpl {
     pub mode: Mode,
     pub read_mode: ReadMode,
     // misc
-    pub error_flash: Vec<Error>,
+    pub error_flash: Vec<anyhow::Error>,
     pub feed_subscription_input: String,
     pub flash: Option<String>,
 }
 
 impl AppImpl {
-    pub fn new(options: crate::Options) -> Result<AppImpl, Error> {
+    pub fn new(options: crate::Options) -> Result<AppImpl> {
         let conn = rusqlite::Connection::open(&options.database_path)?;
         let http_client = reqwest::blocking::ClientBuilder::default()
             .timeout(options.network_timeout)
@@ -400,19 +400,19 @@ impl AppImpl {
         Ok(app)
     }
 
-    pub fn update_feeds(&mut self) -> Result<(), Error> {
+    pub fn update_feeds(&mut self) -> Result<()> {
         let feeds = crate::rss::get_feeds(&self.conn)?.into();
         self.feeds = feeds;
         Ok(())
     }
 
-    pub fn update_current_feed_and_entries(&mut self) -> Result<(), Error> {
+    pub fn update_current_feed_and_entries(&mut self) -> Result<()> {
         self.update_current_feed()?;
         self.update_current_entries()?;
         Ok(())
     }
 
-    fn update_current_feed(&mut self) -> Result<(), Error> {
+    fn update_current_feed(&mut self) -> Result<()> {
         let current_feed = if self.feeds.items.is_empty() {
             None
         } else {
@@ -432,7 +432,7 @@ impl AppImpl {
         Ok(())
     }
 
-    fn update_current_entries(&mut self) -> Result<(), Error> {
+    fn update_current_entries(&mut self) -> Result<()> {
         let entries = if let Some(feed) = &self.current_feed {
             crate::rss::get_entries(&self.conn, &self.read_mode, feed.id)?
                 .into_iter()
@@ -456,7 +456,7 @@ impl AppImpl {
         Ok(())
     }
 
-    fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry, Error>> {
+    fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry>> {
         if let Some(selected_idx) = self.entries.state.selected() {
             if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
                 Some(crate::rss::get_entry(&self.conn, entry_id))
@@ -468,7 +468,7 @@ impl AppImpl {
         }
     }
 
-    pub fn on_enter(&mut self) -> Result<(), Error> {
+    pub fn on_enter(&mut self) -> Result<()> {
         match self.selected {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {

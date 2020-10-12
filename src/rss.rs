@@ -1,5 +1,5 @@
-use crate::error::Error;
 use crate::modes::ReadMode;
+use anyhow::Result;
 use atom_syndication as atom;
 use chrono::prelude::*;
 use rss::Channel;
@@ -36,16 +36,13 @@ impl ToString for FeedKind {
 }
 
 impl FromStr for FeedKind {
-    type Err = crate::error::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Atom" => Ok(FeedKind::Atom),
             "RSS" => Ok(FeedKind::RSS),
-            _ => Err(crate::error::Error::FeedKindError(format!(
-                "{} is not a valid FeedKind",
-                s
-            ))),
+            _ => Err(anyhow::anyhow!(format!("{} is not a valid FeedKind", s))),
         }
     }
 }
@@ -78,7 +75,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+    pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<()> {
         if self.read_at.is_none() {
             self.mark_entry_as_read(&conn)
         } else {
@@ -86,13 +83,13 @@ impl Entry {
         }
     }
 
-    fn mark_entry_as_read(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+    fn mark_entry_as_read(&self, conn: &rusqlite::Connection) -> Result<()> {
         let mut statement = conn.prepare("UPDATE entries SET read_at = ?2 WHERE id = ?1")?;
         statement.execute(params![self.id, Utc::now()])?;
         Ok(())
     }
 
-    fn mark_entry_as_unread(&self, conn: &rusqlite::Connection) -> Result<(), Error> {
+    fn mark_entry_as_unread(&self, conn: &rusqlite::Connection) -> Result<()> {
         let mut statement = conn.prepare("UPDATE entries SET read_at = NULL WHERE id = ?1")?;
         statement.execute(params![self.id])?;
         Ok(())
@@ -153,7 +150,8 @@ impl FeedAndEntries {
 }
 
 impl FromStr for FeedAndEntries {
-    type Err = crate::error::Error;
+    type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match atom::Feed::from_str(s) {
             Ok(atom_feed) => {
@@ -208,7 +206,7 @@ pub fn subscribe_to_feed(
     http_client: &reqwest::blocking::Client,
     conn: &rusqlite::Connection,
     url: &str,
-) -> Result<FeedId, Error> {
+) -> Result<FeedId> {
     let feed_and_entries: FeedAndEntries = fetch_feed(http_client, url)?;
     let feed_id = create_feed(conn, &feed_and_entries.feed)?;
     add_entries_to_feed(conn, feed_id, &feed_and_entries.entries)?;
@@ -216,7 +214,7 @@ pub fn subscribe_to_feed(
     Ok(feed_id)
 }
 
-fn fetch_feed(http_client: &reqwest::blocking::Client, url: &str) -> Result<FeedAndEntries, Error> {
+fn fetch_feed(http_client: &reqwest::blocking::Client, url: &str) -> Result<FeedAndEntries> {
     let resp = http_client.get(url).send()?.text()?;
     let mut feed = FeedAndEntries::from_str(&resp)?;
     feed.set_feed_link(url);
@@ -231,7 +229,7 @@ pub fn refresh_feed(
     client: &reqwest::blocking::Client,
     conn: &rusqlite::Connection,
     feed_id: FeedId,
-) -> Result<(), Error> {
+) -> Result<()> {
     let feed_url = get_feed_url(conn, feed_id)?;
     let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)?;
     let remote_items = remote_feed.entries;
@@ -266,7 +264,7 @@ pub fn refresh_feed(
     Ok(())
 }
 
-pub fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
+pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -307,7 +305,7 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId, Error> {
+fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
     conn.execute(
         "INSERT INTO feeds (title, link, feed_link, feed_kind)
         VALUES (?1, ?2, ?3, ?4)",
@@ -326,7 +324,7 @@ fn add_entries_to_feed(
     conn: &rusqlite::Connection,
     feed_id: FeedId,
     entries: &[Entry],
-) -> Result<(), Error> {
+) -> Result<()> {
     if !entries.is_empty() {
         let now = Utc::now();
 
@@ -408,7 +406,7 @@ fn build_bulk_insert_query<T>(
     query
 }
 
-pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed, Error> {
+pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
     let s = conn.query_row(
         "SELECT id, title, feed_link, link, feed_kind, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
         params![feed_id],
@@ -431,7 +429,7 @@ pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed, Er
     Ok(s)
 }
 
-fn update_feed_refreshed_at(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<(), Error> {
+fn update_feed_refreshed_at(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<()> {
     conn.execute(
         "UPDATE feeds SET refreshed_at = ?2 WHERE id = ?1",
         params![feed_id, Utc::now()],
@@ -440,7 +438,7 @@ fn update_feed_refreshed_at(conn: &rusqlite::Connection, feed_id: FeedId) -> Res
     Ok(())
 }
 
-fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String, Error> {
+pub fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String> {
     let s: String = conn.query_row(
         "SELECT feed_link FROM feeds WHERE id=?1",
         params![feed_id],
@@ -450,7 +448,7 @@ fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String, 
     Ok(s)
 }
 
-pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>, Error> {
+pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
     let mut statement = conn.prepare(
         "SELECT 
           id, 
@@ -482,7 +480,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>, Error> {
     Ok(feeds)
 }
 
-pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry, Error> {
+pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry> {
     let result = conn.query_row(
         "SELECT 
           id, 
@@ -522,7 +520,7 @@ pub fn get_entries(
     conn: &rusqlite::Connection,
     read_mode: &ReadMode,
     feed_id: FeedId,
-) -> Result<Vec<Entry>, Error> {
+) -> Result<Vec<Entry>> {
     let read_at_predicate = match read_mode {
         ReadMode::ShowUnread => "\nAND read_at IS NULL",
         ReadMode::ShowRead => "\nAND read_at IS NOT NULL",

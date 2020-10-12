@@ -40,6 +40,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
 
             draw_entry(
                 f,
+                app,
                 chunks[1],
                 app.entry_scroll_position,
                 &app.current_entry_text,
@@ -366,23 +367,7 @@ where
             .direction(Direction::Vertical)
             .split(area);
         {
-            let error_text = app
-                .error_flash
-                .iter()
-                .flat_map(|error| {
-                    let mut e = format!("{:?}", error)
-                        .split('\n')
-                        .map(|line| {
-                            let mut s = String::with_capacity(line.len() + 1);
-                            s.push_str(line);
-                            s.push_str("\n");
-                            Span::raw(s)
-                        })
-                        .collect::<Vec<_>>();
-                    e.push(Span::raw("\n"));
-                    e
-                })
-                .collect::<Vec<_>>();
+            let error_text = error_text(app);
 
             let block = Block::default().borders(Borders::ALL).title(Span::styled(
                 "Error - press 'q' to close",
@@ -391,7 +376,7 @@ where
                     .add_modifier(Modifier::BOLD),
             ));
 
-            let error_widget = Paragraph::new(Spans::from(error_text))
+            let error_widget = Paragraph::new(error_text)
                 .block(block)
                 .wrap(Wrap { trim: false })
                 .scroll((0, 0));
@@ -406,11 +391,12 @@ where
 
 fn draw_entry<B>(
     f: &mut Frame<B>,
+    app: &AppImpl,
     area: Rect,
     scroll: u16,
     current_entry_text: &str,
     entry_title: &str,
-    error_flash: &[crate::error::Error],
+    error_flash: &[anyhow::Error],
     feed_title: &str,
 ) where
     B: Backend,
@@ -438,25 +424,7 @@ fn draw_entry<B>(
             .direction(Direction::Vertical)
             .split(area);
         {
-            // see https://github.com/dtolnay/indoc/blob/902c3eba53a7c1206ee43262768e6dff6f882f29/unindent/src/lib.rs#L123-L130
-            // for a function that can count leading spaces.
-            let error_text = error_flash
-                .iter()
-                .flat_map(|error| {
-                    let mut e = format!("{:?}", error)
-                        .split('\n')
-                        .map(|line| {
-                            let mut s = String::with_capacity(line.len() + 1);
-                            s.push_str(line);
-                            s.push_str("\n");
-                            Span::from(s)
-                        })
-                        .collect::<Vec<_>>();
-                    e.push(Span::raw("\n"));
-                    e
-                })
-                .collect::<Vec<_>>();
-
+            let error_text = error_text(app);
             let block = Block::default().borders(Borders::ALL).title(Span::styled(
                 "Error - press 'q' to close",
                 Style::default()
@@ -475,4 +443,17 @@ fn draw_entry<B>(
     } else {
         f.render_widget(paragraph, area);
     }
+}
+
+fn error_text(app: &AppImpl) -> String {
+    app.error_flash
+        .iter()
+        .flat_map(|e| {
+            format!("{:?}", e)
+                .split("\n")
+                .map(|s| s.to_owned())
+                .collect::<Vec<String>>()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
 }
