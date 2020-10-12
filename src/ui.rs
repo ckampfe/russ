@@ -2,7 +2,7 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
+    text::{Span, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
@@ -27,27 +27,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
             draw_entries(f, chunks[1], app);
         }
         Selected::Entry(entry) => {
-            let default_entry_title = "No entry title".to_string();
-            let default_feed_title = "No feed title".to_string();
-
-            let entry_title = entry.title.as_ref().unwrap_or_else(|| &default_entry_title);
-
-            let current_feed_title = app
-                .current_feed
-                .as_ref()
-                .and_then(|feed| feed.title.as_ref())
-                .unwrap_or_else(|| &default_feed_title);
-
-            draw_entry(
-                f,
-                app,
-                chunks[1],
-                app.entry_scroll_position,
-                &app.current_entry_text,
-                entry_title,
-                &app.error_flash,
-                &current_feed_title,
-            );
+            draw_entry(f, app, &entry, chunks[1], app.entry_scroll_position);
         }
     }
 }
@@ -367,7 +347,7 @@ where
             .direction(Direction::Vertical)
             .split(area);
         {
-            let error_text = error_text(app);
+            let error_text = error_text(&app.error_flash);
 
             let block = Block::default().borders(Borders::ALL).title(Span::styled(
                 "Error - press 'q' to close",
@@ -389,19 +369,21 @@ where
     }
 }
 
-fn draw_entry<B>(
-    f: &mut Frame<B>,
-    app: &AppImpl,
-    area: Rect,
-    scroll: u16,
-    current_entry_text: &str,
-    entry_title: &str,
-    error_flash: &[anyhow::Error],
-    feed_title: &str,
-) where
+fn draw_entry<B>(f: &mut Frame<B>, app: &AppImpl, entry: &Entry, area: Rect, scroll: u16)
+where
     B: Backend,
 {
-    let text = current_entry_text;
+    let default_entry_title = "No entry title".to_string();
+    let default_feed_title = "No feed title".to_string();
+
+    let entry_title = entry.title.as_ref().unwrap_or_else(|| &default_entry_title);
+
+    let feed_title = app
+        .current_feed
+        .as_ref()
+        .and_then(|feed| feed.title.as_ref())
+        .unwrap_or_else(|| &default_feed_title);
+
     let mut title = entry_title.to_string();
     title.push_str(" - ");
     title.push_str(feed_title);
@@ -413,18 +395,18 @@ fn draw_entry<B>(
             .fg(Color::Cyan),
     ));
 
-    let paragraph = Paragraph::new(text)
+    let paragraph = Paragraph::new(app.current_entry_text.as_str())
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((scroll, 0));
 
-    if !error_flash.is_empty() {
+    if !app.error_flash.is_empty() {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
             .direction(Direction::Vertical)
             .split(area);
         {
-            let error_text = error_text(app);
+            let error_text = error_text(&app.error_flash);
             let block = Block::default().borders(Borders::ALL).title(Span::styled(
                 "Error - press 'q' to close",
                 Style::default()
@@ -432,7 +414,7 @@ fn draw_entry<B>(
                     .fg(Color::Cyan),
             ));
 
-            let error_widget = Paragraph::new(Spans::from(error_text))
+            let error_widget = Paragraph::new(error_text)
                 .block(block)
                 .wrap(Wrap { trim: false })
                 .scroll((0, 0));
@@ -445,14 +427,16 @@ fn draw_entry<B>(
     }
 }
 
-fn error_text(app: &AppImpl) -> String {
-    app.error_flash
+fn error_text(errors: &[anyhow::Error]) -> String {
+    errors
         .iter()
         .flat_map(|e| {
-            format!("{:?}", e)
-                .split("\n")
+            let mut s = format!("{:?}", e)
+                .split('\n')
                 .map(|s| s.to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>();
+            s.push("\n".to_string());
+            s
         })
         .collect::<Vec<String>>()
         .join("\n")
