@@ -274,6 +274,7 @@ fn main() -> Result<()> {
 
                         io_s.send(IOCommand::RefreshAllFeeds(feed_ids))?;
                     }
+                    (KeyCode::Char('?'), _) => app.toggle_help()?,
                     (KeyCode::Char(c), KeyModifiers::NONE) => app.on_key(c)?,
                     (KeyCode::Left, _) => app.on_left()?,
                     (KeyCode::Up, _) => app.on_up()?,

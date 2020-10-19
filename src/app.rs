@@ -151,6 +151,11 @@ impl App {
         inner.on_enter()
     }
 
+    pub fn toggle_help(&self) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.toggle_help()
+    }
+
     fn put_current_link_in_clipboard(&self) -> Result<()> {
         let mut ctx = ClipboardContext::new().unwrap();
 
@@ -350,11 +355,13 @@ pub struct AppImpl {
     pub entry_selection_position: usize,
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
+    pub entry_lines_len: usize,
     // modes
     pub should_quit: bool,
     pub selected: Selected,
     pub mode: Mode,
     pub read_mode: ReadMode,
+    pub show_help: bool,
     // misc
     pub error_flash: Vec<anyhow::Error>,
     pub feed_subscription_input: String,
@@ -384,12 +391,14 @@ impl AppImpl {
             entries: initial_entries,
             selected,
             entry_scroll_position: 0,
+            entry_lines_len: 0,
             current_entry: None,
             current_entry_text: String::new(),
             current_feed: initial_current_feed,
             feed_subscription_input: String::new(),
             mode: Mode::Normal,
             read_mode: ReadMode::ShowUnread,
+            show_help: true,
             entry_selection_position: 0,
             flash: None,
         };
@@ -489,6 +498,7 @@ impl AppImpl {
 
                         if let Some(html) = entry_html {
                             let text = html2text::from_read(html.as_bytes(), self.line_length);
+                            self.entry_lines_len = text.matches('\n').count();
                             self.current_entry_text = text;
                         } else {
                             self.current_entry_text = String::new();
@@ -502,5 +512,10 @@ impl AppImpl {
             }
             _ => Ok(()),
         }
+    }
+
+    pub fn toggle_help(&mut self) -> Result<()> {
+        self.show_help = !self.show_help;
+        Ok(())
     }
 }

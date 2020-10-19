@@ -3,7 +3,7 @@ use tui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -36,27 +36,25 @@ fn draw_info_column<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
-    let constraints = match &app.mode {
-        Mode::Normal => [
-            Constraint::Percentage(70),
-            Constraint::Percentage(20),
-            Constraint::Percentage(10),
-        ]
-        .as_ref(),
-        Mode::Editing => [
+    let mut constraints = match &app.mode {
+        Mode::Normal => vec![Constraint::Percentage(70), Constraint::Percentage(20)],
+        Mode::Editing => vec![
             Constraint::Percentage(60),
             Constraint::Percentage(20),
             Constraint::Percentage(10),
-            Constraint::Percentage(10),
-        ]
-        .as_ref(),
+        ],
     };
+
+    if app.show_help {
+        constraints.push(Constraint::Percentage(10));
+    }
+
     let chunks = Layout::default()
         .constraints(constraints)
         .direction(Direction::Vertical)
         .split(area);
     {
-        //FEEDS
+        // FEEDS
         draw_feeds(f, chunks[0], app);
 
         // INFO
@@ -76,12 +74,18 @@ where
             }
         }
 
-        // HELP SECTION
-        draw_help(f, chunks[2], app);
-
-        // INPUT SECTION
-        if let Mode::Editing = &app.mode {
-            draw_new_feed_input(f, chunks[3], app)
+        match (app.mode, app.show_help) {
+            (Mode::Editing, true) => {
+                draw_new_feed_input(f, chunks[2], app);
+                draw_help(f, chunks[3], app);
+            }
+            (Mode::Editing, false) => {
+                draw_new_feed_input(f, chunks[2], app);
+            }
+            (_, true) => {
+                draw_help(f, chunks[2], app);
+            }
+            _ => (),
         }
     }
 }
@@ -274,9 +278,11 @@ where
         }
     }
     match app.mode {
-        Mode::Normal => text.push_str("i - edit mode; q - exit"),
-        Mode::Editing => text.push_str("esc - normal mode; enter - fetch feed"),
+        Mode::Normal => text.push_str("i - edit mode; q - exit\n"),
+        Mode::Editing => text.push_str("esc - normal mode; enter - fetch feed\n"),
     }
+
+    text.push_str("? - show/hide help");
 
     let help_message =
         Paragraph::new(Text::from(text.as_str())).block(Block::default().borders(Borders::ALL));
@@ -400,9 +406,47 @@ where
         .wrap(Wrap { trim: false })
         .scroll((scroll, 0));
 
+    let entry_chunk_height = area.height - 2;
+
+    let progress_gauge_chunk_percent = 3;
+
+    let entry_percent = 100.0 - progress_gauge_chunk_percent as f32;
+
+    let real_entry_chunk_height =
+        (entry_chunk_height as f32 * (entry_percent / 100.0)).floor() as u16;
+
+    let percent = if app.entry_lines_len > 0 {
+        let furthest_visible_position = app.entry_scroll_position + real_entry_chunk_height;
+        let percent = ((furthest_visible_position as f32 / app.entry_lines_len as f32) * 100.0)
+            .floor() as usize;
+
+        if percent <= 100 {
+            percent
+        } else {
+            100
+        }
+    } else {
+        0
+    };
+
+    let label = format!("{}/100", percent);
+    let ratio = percent as f64 / 100.0;
+    let gauge = LineGauge::default()
+        .block(Block::default().borders(Borders::NONE))
+        .gauge_style(Style::default().fg(Color::Rgb(255, 150, 167)))
+        .ratio(ratio)
+        .label(label);
+
     if !app.error_flash.is_empty() {
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
+            .constraints(
+                [
+                    Constraint::Percentage(56),
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(progress_gauge_chunk_percent),
+                ]
+                .as_ref(),
+            )
             .direction(Direction::Vertical)
             .split(area);
         {
@@ -421,9 +465,22 @@ where
 
             f.render_widget(paragraph, chunks[0]);
             f.render_widget(error_widget, chunks[1]);
+            f.render_widget(gauge, chunks[2]);
         }
     } else {
-        f.render_widget(paragraph, area);
+        let chunks = Layout::default()
+            .constraints(
+                [
+                    Constraint::Percentage(entry_percent.ceil() as u16),
+                    Constraint::Percentage(progress_gauge_chunk_percent),
+                ]
+                .as_ref(),
+            )
+            .direction(Direction::Vertical)
+            .split(area);
+
+        f.render_widget(paragraph, chunks[0]);
+        f.render_widget(gauge, chunks[1]);
     }
 }
 
