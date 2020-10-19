@@ -77,7 +77,7 @@ Press `q` or `Esc` to quit Russ.
 
 ```
 $ russ -h
-russ ccf8f7a
+russ 0aad340
 
 USAGE:
     russ [OPTIONS] --database-path <database-path>
@@ -93,6 +93,9 @@ OPTIONS:
 
     -l, --line-length <line-length>
             maximum line length for entries [default: 90]
+
+    -n, --network-timeout <network-timeout>
+            RSS/Atom network request timeout in seconds [default: 5]
 
     -t, --tick-rate <tick-rate>                                              time in ms between two ticks [default: 250]
 ```
@@ -152,6 +155,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] fix N+1 queries on feed/entry creation
 - [x] set up CI
 - [x] copy feed and entry links to clipboard
+- [x] add a network timeout for fetching new rss/atom entries (default: 5 seconds)
 - [x] show scroll progress for an entry
 - [x] show/hide help with `?`
 
