@@ -111,9 +111,21 @@ That said: Russ is generally stable! I use it every day to read my feeds, and I 
 I have no major features planned that would require breaking schema or interface changes.
 I will do my best not to break any data contracts, and will change this text if I believe that Russ has stabilized enough to be considered "stable" or "1.0".
 
-## todo
+## features
 
 This is not a strict feature list. Unchecked items are ideas to explore rather than features that are going to be built.
+
+### todo
+
+- [ ] visual indicator for which feeds have new/unacknowledged entries
+- [ ] profiling mode that shows speed of UI interaction
+- [ ] stabilize the database schema
+- [ ] migration process for database changes
+- [ ] automatically fetch entries that only provide a link field
+- [ ] debug view (show app state)
+- [ ] deleting feeds
+
+### done
 
 - [x] rss support
 - [x] atom support
@@ -131,22 +143,16 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] configurable word wrapping line length
 - [x] parse and store proper `chrono::DateTime<Utc>` for `pub_date`
 - [x] sort entries by `pub_date` descending, fall back to `inserted_at` if no `pub_date`
-- [ ] profiling mode that shows speed of UI interaction
-- [ ] stabilize the database schema
-- [ ] migration process for database changes
 - [x] nonblocking IO (inspiration: https://keliris.dev/improving-spotify-tui/)
-- [ ] automatically fetch entries that only provide a link field
-- [ ] debug view (show app state)
-- [ ] deleting feeds
 - [x] refresh all feeds
 - [x] refresh all feeds in parallel (multithreaded IO)
 - [x] use a database connection pool when refreshing feeds
 - [x] show refresh time for single feed and all feeds
-- [ ] mark entries as "favorite"
-- [ ] some kind of search
 - [x] fix N+1 queries on feed/entry creation
 - [x] set up CI
 - [x] copy feed and entry links to clipboard
+- [x] show scroll progress for an entry
+- [x] show/hide help with `?`
 
 ## license
 
