@@ -26,7 +26,7 @@ I do not currently publish binary releases, but that may change if someone is in
 
 Russ has few controls, that mostly follow a small subset of vim's controls.
 If you know vim, Russ should feel natural.
-The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `Esc`, `Enter`.
+The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `c`, `Esc`, `Enter`.
 Pressing `?` shows/hides the help section that describes these controls.
 
 ### insert mode
@@ -54,6 +54,8 @@ To mark a selected entry as read, press `r`.
 By default, Russ will only show unread entries, so any entries marked read will disappear from the entry list.
 To view entries you have marked read, press `a`. You can mark them unread by pressing `r` on a selected entry.
 To view entries that are unread (the default state), press `a` again.
+
+Pressing `c` copies the URL of the current feed or entry to your clipboard, depending on which is in focus.
 
 To refresh a single feed, press `r` when you are in the most general context (all the way to the left) and that feed is highlighted.
 To refresh all feeds, press `x` when in the most general context.
