@@ -441,9 +441,9 @@ where
         let chunks = Layout::default()
             .constraints(
                 [
-                    Constraint::Percentage(56),
-                    Constraint::Percentage(30),
+                    Constraint::Percentage(57),
                     Constraint::Percentage(progress_gauge_chunk_percent),
+                    Constraint::Percentage(40),
                 ]
                 .as_ref(),
             )
@@ -464,8 +464,8 @@ where
                 .scroll((0, 0));
 
             f.render_widget(paragraph, chunks[0]);
-            f.render_widget(error_widget, chunks[1]);
-            f.render_widget(gauge, chunks[2]);
+            f.render_widget(gauge, chunks[1]);
+            f.render_widget(error_widget, chunks[2]);
         }
     } else {
         let chunks = Layout::default()
