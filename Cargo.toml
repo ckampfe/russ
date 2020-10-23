@@ -16,7 +16,7 @@ diligent-date-parser = "0.1"
 html2text = "0.2"
 r2d2 = "0.8"
 r2d2_sqlite = "0.17"
-rayon = "1.4"
+rayon = "1.5"
 reqwest = { version = "0.10", features = ["blocking"] }
 rss = { git = "https://github.com/rust-syndication/rss", rev = "2a975b0" }
 rusqlite = { version = "0.24", features = ["chrono"] }
