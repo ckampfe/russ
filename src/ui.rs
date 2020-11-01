@@ -184,33 +184,33 @@ where
     B: Backend,
 {
     let mut text = String::new();
-    if let Some(item) = &app
+    if let Some(item) = app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.title.as_ref())
     {
         text.push_str("Title: ");
-        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str(item);
         text.push_str("\n");
     }
 
-    if let Some(item) = &app
+    if let Some(item) = app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.link.as_ref())
     {
         text.push_str("Link: ");
-        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str(item);
         text.push_str("\n");
     }
 
-    if let Some(item) = &app
+    if let Some(item) = app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.feed_link.as_ref())
     {
         text.push_str("Feed link: ");
-        text.push_str(item.to_owned().to_string().as_str());
+        text.push_str(item);
         text.push_str("\n");
     }
 
@@ -226,7 +226,7 @@ where
         .current_feed
         .as_ref()
         .and_then(|feed| feed.refreshed_at)
-        .map(|timestamp| timestamp.to_owned().to_string())
+        .map(|timestamp| timestamp.to_string())
         .or_else(|| Some("Never refreshed".to_string()))
     {
         text.push_str("Refreshed at: ");

@@ -490,7 +490,7 @@ impl AppImpl {
                         // if no description tag,
                         // use empty string.
                         // TODO figure out what to actually do if there are neither
-                        let entry_html = &entry
+                        let entry_html = entry
                             .content
                             .as_ref()
                             .or_else(|| entry.description.as_ref())
