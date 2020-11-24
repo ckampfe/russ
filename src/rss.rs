@@ -385,14 +385,14 @@ fn build_bulk_insert_query<T>(
         }
         let parameter_values_string = parameters_values.join(", ");
         parameter_group_string.push_str(&parameter_values_string);
-        parameter_group_string.push_str(")");
+        parameter_group_string.push(')');
         parameter_groups_strings.push(parameter_group_string);
     }
 
     let paramter_groups_string = parameter_groups_strings.join(", ");
 
     let mut columns_string = "".to_string();
-    columns_string.push_str("(");
+    columns_string.push('(');
     columns_string.push_str(&columns.join(", "));
     columns_string.push_str(") ");
 

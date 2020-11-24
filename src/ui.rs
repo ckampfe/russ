@@ -98,32 +98,32 @@ where
     if let Some(item) = &entry.title {
         text.push_str("Title: ");
         text.push_str(item.to_string().as_str());
-        text.push_str("\n");
+        text.push('\n');
     };
 
     if let Some(item) = &entry.link {
         text.push_str("Link: ");
         text.push_str(item);
-        text.push_str("\n");
+        text.push('\n');
     }
 
     if let Some(pub_date) = &entry.pub_date {
         text.push_str("Pub. date: ");
         text.push_str(pub_date.to_string().as_str());
-        text.push_str("\n");
+        text.push('\n');
     } else {
         // TODO this should probably pull the <updated> tag
         // and use that
         let inserted_at = entry.inserted_at;
         text.push_str("Pulled date: ");
         text.push_str(inserted_at.to_string().as_str());
-        text.push_str("\n");
+        text.push('\n');
     }
 
     if let Some(read_at) = &entry.read_at {
         text.push_str("Read at: ");
         text.push_str(read_at.to_string().as_str());
-        text.push_str("\n");
+        text.push('\n');
     }
 
     let block = Block::default().borders(Borders::ALL).title(Span::styled(
@@ -154,7 +154,7 @@ where
         .collect::<Vec<ListItem>>();
 
     let default_title = String::from("Feeds");
-    let title = app.flash.as_ref().unwrap_or_else(|| &default_title);
+    let title = app.flash.as_ref().unwrap_or(&default_title);
 
     let feeds = List::new(feeds).block(
         Block::default().borders(Borders::ALL).title(Span::styled(
@@ -191,7 +191,7 @@ where
     {
         text.push_str("Title: ");
         text.push_str(item);
-        text.push_str("\n");
+        text.push('\n');
     }
 
     if let Some(item) = app
@@ -201,7 +201,7 @@ where
     {
         text.push_str("Link: ");
         text.push_str(item);
-        text.push_str("\n");
+        text.push('\n');
     }
 
     if let Some(item) = app
@@ -211,14 +211,14 @@ where
     {
         text.push_str("Feed link: ");
         text.push_str(item);
-        text.push_str("\n");
+        text.push('\n');
     }
 
     if let Some(item) = app.entries.items.get(0) {
         if let Some(pub_date) = &item.pub_date {
             text.push_str("Most recent entry at: ");
             text.push_str(pub_date.to_string().as_str());
-            text.push_str("\n");
+            text.push('\n');
         }
     }
 
@@ -231,7 +231,7 @@ where
     {
         text.push_str("Refreshed at: ");
         text.push_str(item.as_str());
-        text.push_str("\n");
+        text.push('\n');
     }
 
     match app.read_mode {
@@ -240,12 +240,12 @@ where
         ReadMode::All => unreachable!("ReadMode::All should never be possible from the UI!"),
     }
     text.push_str(app.entries.items.len().to_string().as_str());
-    text.push_str("\n");
+    text.push('\n');
 
     if let Some(feed_kind) = app.current_feed.as_ref().map(|feed| feed.feed_kind) {
         text.push_str("Feed kind: ");
         text.push_str(&feed_kind.to_string());
-        text.push_str("\n");
+        text.push('\n');
     }
 
     let block = Block::default().borders(Borders::ALL).title(Span::styled(
@@ -325,7 +325,7 @@ where
         .current_feed
         .as_ref()
         .and_then(|feed| feed.title.as_ref())
-        .unwrap_or_else(|| &default_title);
+        .unwrap_or(&default_title);
 
     let entries_titles = List::new(entries).block(
         Block::default().borders(Borders::ALL).title(Span::styled(
@@ -382,15 +382,15 @@ where
     let default_entry_title = "No entry title".to_string();
     let default_feed_title = "No feed title".to_string();
 
-    let entry_title = entry.title.as_ref().unwrap_or_else(|| &default_entry_title);
+    let entry_title = entry.title.as_ref().unwrap_or(&default_entry_title);
 
     let feed_title = app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.title.as_ref())
-        .unwrap_or_else(|| &default_feed_title);
+        .unwrap_or(&default_feed_title);
 
-    let mut title = entry_title.to_string();
+    let mut title = entry_title.to_owned();
     title.push_str(" - ");
     title.push_str(feed_title);
 

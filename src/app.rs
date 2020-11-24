@@ -494,7 +494,7 @@ impl AppImpl {
                             .content
                             .as_ref()
                             .or_else(|| entry.description.as_ref())
-                            .or_else(|| Some(&empty_string));
+                            .or(Some(&empty_string));
 
                         if let Some(html) = entry_html {
                             let text = html2text::from_read(html.as_bytes(), self.line_length);
