@@ -239,9 +239,9 @@ pub fn refresh_feed(
         .cloned()
         .collect::<HashSet<String>>();
 
-    let local_entries_links = get_entries(conn, &ReadMode::All, feed_id)?
+    let local_entries_links = get_entries_links(conn, &ReadMode::All, feed_id)?
         .into_iter()
-        .flat_map(|entry| entry.link)
+        .flatten()
         .collect::<HashSet<_>>();
 
     let difference = remote_items_links
@@ -569,6 +569,34 @@ pub fn get_entries(
     }
 
     Ok(entries)
+}
+
+pub fn get_entries_links(
+    conn: &rusqlite::Connection,
+    read_mode: &ReadMode,
+    feed_id: FeedId,
+) -> Result<Vec<Option<String>>> {
+    let read_at_predicate = match read_mode {
+        ReadMode::ShowUnread => "\nAND read_at IS NULL",
+        ReadMode::ShowRead => "\nAND read_at IS NOT NULL",
+        ReadMode::All => "\n",
+    };
+
+    // we get weird pubDate formats from feeds,
+    // so sort by inserted at as this as a stable order at least
+    let mut query = "SELECT link FROM entries WHERE feed_id=?1".to_string();
+
+    query.push_str(read_at_predicate);
+    query.push_str("\nORDER BY pub_date DESC, inserted_at DESC");
+
+    let mut links = vec![];
+    let mut statement = conn.prepare(&query)?;
+
+    for link in statement.query_map(params![feed_id], |row| Ok(row.get(0)?))? {
+        links.push(link?);
+    }
+
+    Ok(links)
 }
 
 #[cfg(test)]
