@@ -74,28 +74,6 @@ pub struct Entry {
     pub updated_at: chrono::DateTime<Utc>,
 }
 
-impl Entry {
-    pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<()> {
-        if self.read_at.is_none() {
-            self.mark_entry_as_read(&conn)
-        } else {
-            self.mark_entry_as_unread(conn)
-        }
-    }
-
-    fn mark_entry_as_read(&self, conn: &rusqlite::Connection) -> Result<()> {
-        let mut statement = conn.prepare("UPDATE entries SET read_at = ?2 WHERE id = ?1")?;
-        statement.execute(params![self.id, Utc::now()])?;
-        Ok(())
-    }
-
-    fn mark_entry_as_unread(&self, conn: &rusqlite::Connection) -> Result<()> {
-        let mut statement = conn.prepare("UPDATE entries SET read_at = NULL WHERE id = ?1")?;
-        statement.execute(params![self.id])?;
-        Ok(())
-    }
-}
-
 impl From<&atom::Entry> for Entry {
     fn from(entry: &atom::Entry) -> Self {
         Self {
@@ -132,6 +110,46 @@ impl From<&rss::Item> for Entry {
             updated_at: Utc::now(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct EntryMeta {
+    pub id: EntryId,
+    pub feed_id: FeedId,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub pub_date: Option<chrono::DateTime<Utc>>,
+    pub link: Option<String>,
+    pub read_at: Option<chrono::DateTime<Utc>>,
+    pub inserted_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+impl EntryMeta {
+    pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<()> {
+        if self.read_at.is_none() {
+            self.mark_as_read(&conn)
+        } else {
+            self.mark_as_unread(conn)
+        }
+    }
+
+    fn mark_as_read(&self, conn: &rusqlite::Connection) -> Result<()> {
+        let mut statement = conn.prepare("UPDATE entries SET read_at = ?2 WHERE id = ?1")?;
+        statement.execute(params![self.id, Utc::now()])?;
+        Ok(())
+    }
+
+    fn mark_as_unread(&self, conn: &rusqlite::Connection) -> Result<()> {
+        let mut statement = conn.prepare("UPDATE entries SET read_at = NULL WHERE id = ?1")?;
+        statement.execute(params![self.id])?;
+        Ok(())
+    }
+}
+
+pub struct EntryContent {
+    pub content: Option<String>,
+    pub description: Option<String>,
 }
 
 fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
@@ -480,7 +498,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
     Ok(feeds)
 }
 
-pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry> {
+pub fn get_entry_meta(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<EntryMeta> {
     let result = conn.query_row(
         "SELECT 
           id, 
@@ -488,8 +506,6 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
           title, 
           author, 
           pub_date, 
-          description, 
-          content, 
           link, 
           read_at, 
           inserted_at, 
@@ -497,18 +513,16 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
         FROM entries WHERE id=?1",
         params![entry_id],
         |row| {
-            Ok(Entry {
+            Ok(EntryMeta {
                 id: row.get(0)?,
                 feed_id: row.get(1)?,
                 title: row.get(2)?,
                 author: row.get(3)?,
                 pub_date: row.get(4)?,
-                description: row.get(5)?,
-                content: row.get(6)?,
-                link: row.get(7)?,
-                read_at: row.get(8)?,
-                inserted_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                link: row.get(5)?,
+                read_at: row.get(6)?,
+                inserted_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         },
     )?;
@@ -516,11 +530,26 @@ pub fn get_entry(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<Entry
     Ok(result)
 }
 
-pub fn get_entries(
+pub fn get_entry_content(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<EntryContent> {
+    let result = conn.query_row(
+        "SELECT content, description FROM entries WHERE id=?1",
+        params![entry_id],
+        |row| {
+            Ok(EntryContent {
+                content: row.get(0)?,
+                description: row.get(1)?,
+            })
+        },
+    )?;
+
+    Ok(result)
+}
+
+pub fn get_entries_metas(
     conn: &rusqlite::Connection,
     read_mode: &ReadMode,
     feed_id: FeedId,
-) -> Result<Vec<Entry>> {
+) -> Result<Vec<EntryMeta>> {
     let read_at_predicate = match read_mode {
         ReadMode::ShowUnread => "\nAND read_at IS NULL",
         ReadMode::ShowRead => "\nAND read_at IS NOT NULL",
@@ -535,8 +564,6 @@ pub fn get_entries(
         title, 
         author, 
         pub_date, 
-        description, 
-        content, 
         link, 
         read_at, 
         inserted_at, 
@@ -551,18 +578,16 @@ pub fn get_entries(
     let mut statement = conn.prepare(&query)?;
     let mut entries = vec![];
     for entry in statement.query_map(params![feed_id], |row| {
-        Ok(Entry {
+        Ok(EntryMeta {
             id: row.get(0)?,
             feed_id: row.get(1)?,
             title: row.get(2)?,
             author: row.get(3)?,
             pub_date: row.get(4)?,
-            description: row.get(5)?,
-            content: row.get(6)?,
-            link: row.get(7)?,
-            read_at: row.get(8)?,
-            inserted_at: row.get(9)?,
-            updated_at: row.get(10)?,
+            link: row.get(5)?,
+            read_at: row.get(6)?,
+            inserted_at: row.get(7)?,
+            updated_at: row.get(8)?,
         })
     })? {
         entries.push(entry?)
@@ -640,11 +665,11 @@ mod tests {
         initialize_db(&conn).unwrap();
         subscribe_to_feed(&http_client, &conn, ZCT).unwrap();
         let feed_id = 1;
-        let old_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
+        let old_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
         refresh_feed(&http_client, &conn, feed_id).unwrap();
-        let e = get_entry(&conn, 1).unwrap();
-        e.mark_entry_as_read(&conn).unwrap();
-        let new_entries = get_entries(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
+        let e = get_entry_meta(&conn, 1).unwrap();
+        e.mark_as_read(&conn).unwrap();
+        let new_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
         assert_eq!(new_entries.len(), old_entries.len() - 1);
     }

@@ -59,10 +59,7 @@ impl App {
                 if !inner.entries.items.is_empty() {
                     inner.entries.previous();
                     inner.entry_selection_position = inner.entries.state.selected().unwrap();
-                    if let Some(entry) = inner.get_selected_entry() {
-                        let entry = entry?;
-                        inner.current_entry = Some(entry);
-                    }
+                    inner.update_current_entry_meta()?;
                 }
             }
             Selected::Entry(_) => {
@@ -87,10 +84,7 @@ impl App {
                 if !inner.entries.items.is_empty() {
                     inner.entries.next();
                     inner.entry_selection_position = inner.entries.state.selected().unwrap();
-                    if let Some(entry) = inner.get_selected_entry() {
-                        let entry = entry?;
-                        inner.current_entry = Some(entry);
-                    }
+                    inner.update_current_entry_meta()?;
                 }
             }
             Selected::Entry(_) => {
@@ -113,10 +107,7 @@ impl App {
                 if !inner.entries.items.is_empty() {
                     inner.selected = Selected::Entries;
                     inner.entries.state.select(Some(0));
-                    if let Some(entry) = inner.get_selected_entry() {
-                        let entry = entry?;
-                        inner.current_entry = Some(entry);
-                    }
+                    inner.update_current_entry_meta()?;
                 }
                 Ok(())
             }
@@ -204,10 +195,7 @@ impl App {
             inner.entries.state.select(None);
         }
 
-        if let Some(entry) = inner.get_selected_entry() {
-            let entry = entry?;
-            inner.current_entry = Some(entry);
-        }
+        inner.update_current_entry_meta()?;
 
         Ok(())
     }
@@ -310,22 +298,14 @@ impl App {
                 entry.toggle_read(&inner.conn)?;
                 inner.selected = Selected::Entries;
                 inner.update_current_entries()?;
-
-                if let Some(entry) = inner.get_selected_entry() {
-                    let entry = entry?;
-                    inner.current_entry = Some(entry);
-                }
-
+                inner.update_current_entry_meta()?;
                 inner.entry_scroll_position = 0;
             }
             Selected::Entries => {
-                if let Some(entry) = &inner.current_entry {
-                    entry.toggle_read(&inner.conn)?;
+                if let Some(entry_meta) = &inner.current_entry_meta {
+                    entry_meta.toggle_read(&inner.conn)?;
                     inner.update_current_entries()?;
-                    if let Some(entry) = inner.get_selected_entry() {
-                        let entry = entry?;
-                        inner.current_entry = Some(entry);
-                    }
+                    inner.update_current_entry_meta()?;
                 }
             }
             Selected::Feeds => (),
@@ -349,8 +329,8 @@ pub struct AppImpl {
     pub current_feed: Option<crate::rss::Feed>,
     pub feeds: util::StatefulList<crate::rss::Feed>,
     // entry stuff
-    pub current_entry: Option<crate::rss::Entry>,
-    pub entries: util::StatefulList<crate::rss::Entry>,
+    pub current_entry_meta: Option<crate::rss::EntryMeta>,
+    pub entries: util::StatefulList<crate::rss::EntryMeta>,
     pub line_length: usize,
     pub entry_selection_position: usize,
     pub current_entry_text: String,
@@ -392,7 +372,7 @@ impl AppImpl {
             selected,
             entry_scroll_position: 0,
             entry_lines_len: 0,
-            current_entry: None,
+            current_entry_meta: None,
             current_entry_text: String::new(),
             current_feed: initial_current_feed,
             feed_subscription_input: String::new(),
@@ -443,7 +423,7 @@ impl AppImpl {
 
     fn update_current_entries(&mut self) -> Result<()> {
         let entries = if let Some(feed) = &self.current_feed {
-            crate::rss::get_entries(&self.conn, &self.read_mode, feed.id)?
+            crate::rss::get_entries_metas(&self.conn, &self.read_mode, feed.id)?
                 .into_iter()
                 .collect::<Vec<_>>()
                 .into()
@@ -465,10 +445,10 @@ impl AppImpl {
         Ok(())
     }
 
-    fn get_selected_entry(&self) -> Option<Result<crate::rss::Entry>> {
+    fn get_selected_entry(&self) -> Option<Result<crate::rss::EntryContent>> {
         if let Some(selected_idx) = self.entries.state.selected() {
             if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
-                Some(crate::rss::get_entry(&self.conn, entry_id))
+                Some(crate::rss::get_entry_content(&self.conn, entry_id))
             } else {
                 None
             }
@@ -477,34 +457,58 @@ impl AppImpl {
         }
     }
 
+    fn get_selected_entry_meta(&self) -> Option<Result<crate::rss::EntryMeta>> {
+        if let Some(selected_idx) = self.entries.state.selected() {
+            if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
+                Some(crate::rss::get_entry_meta(&self.conn, entry_id))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn update_current_entry_meta(&mut self) -> Result<()> {
+        if let Some(entry_meta) = self.get_selected_entry_meta() {
+            let entry_meta = entry_meta?;
+            self.current_entry_meta = Some(entry_meta);
+        }
+        Ok(())
+    }
+
     pub fn on_enter(&mut self) -> Result<()> {
         match self.selected {
             Selected::Entries => {
                 if !self.entries.items.is_empty() {
-                    if let Some(entry) = &self.current_entry {
-                        let empty_string = String::from("No content or description tag provided.");
+                    if let Some(entry_meta) = &self.current_entry_meta {
+                        if let Some(entry) = self.get_selected_entry() {
+                            let entry = entry?;
+                            let empty_string =
+                                String::from("No content or description tag provided.");
 
-                        // try content tag first,
-                        // if there is not content tag,
-                        // go to description tag,
-                        // if no description tag,
-                        // use empty string.
-                        // TODO figure out what to actually do if there are neither
-                        let entry_html = entry
-                            .content
-                            .as_ref()
-                            .or_else(|| entry.description.as_ref())
-                            .or(Some(&empty_string));
+                            // try content tag first,
+                            // if there is not content tag,
+                            // go to description tag,
+                            // if no description tag,
+                            // use empty string.
+                            // TODO figure out what to actually do if there are neither
+                            let entry_html = entry
+                                .content
+                                .as_ref()
+                                .or_else(|| entry.description.as_ref())
+                                .or(Some(&empty_string));
 
-                        if let Some(html) = entry_html {
-                            let text = html2text::from_read(html.as_bytes(), self.line_length);
-                            self.entry_lines_len = text.matches('\n').count();
-                            self.current_entry_text = text;
-                        } else {
-                            self.current_entry_text = String::new();
+                            if let Some(html) = entry_html {
+                                let text = html2text::from_read(html.as_bytes(), self.line_length);
+                                self.entry_lines_len = text.matches('\n').count();
+                                self.current_entry_text = text;
+                            } else {
+                                self.current_entry_text = String::new();
+                            }
                         }
 
-                        self.selected = Selected::Entry(entry.clone());
+                        self.selected = Selected::Entry(entry_meta.clone());
                     }
                 }
 

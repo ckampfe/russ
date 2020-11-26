@@ -9,7 +9,7 @@ use tui::{
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::rss::Entry;
+use crate::rss::EntryMeta;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
     let chunks = Layout::default()
@@ -26,8 +26,8 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
         Selected::Entries => {
             draw_entries(f, chunks[1], app);
         }
-        Selected::Entry(entry) => {
-            draw_entry(f, app, &entry, chunks[1], app.entry_scroll_position);
+        Selected::Entry(entry_meta) => {
+            draw_entry(f, app, &entry_meta, chunks[1], app.entry_scroll_position);
         }
     }
 }
@@ -61,8 +61,8 @@ where
         match &app.selected {
             Selected::Entry(entry) => draw_entry_info(f, chunks[1], entry),
             Selected::Entries => {
-                if let Some(entry) = &app.current_entry {
-                    draw_entry_info(f, chunks[1], entry);
+                if let Some(entry_meta) = &app.current_entry_meta {
+                    draw_entry_info(f, chunks[1], entry_meta);
                 } else {
                     draw_feed_info(f, chunks[1], app);
                 }
@@ -90,37 +90,37 @@ where
     }
 }
 
-fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry: &Entry)
+fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry_meta: &EntryMeta)
 where
     B: Backend,
 {
     let mut text = String::new();
-    if let Some(item) = &entry.title {
+    if let Some(item) = &entry_meta.title {
         text.push_str("Title: ");
         text.push_str(item.to_string().as_str());
         text.push('\n');
     };
 
-    if let Some(item) = &entry.link {
+    if let Some(item) = &entry_meta.link {
         text.push_str("Link: ");
         text.push_str(item);
         text.push('\n');
     }
 
-    if let Some(pub_date) = &entry.pub_date {
+    if let Some(pub_date) = &entry_meta.pub_date {
         text.push_str("Pub. date: ");
         text.push_str(pub_date.to_string().as_str());
         text.push('\n');
     } else {
         // TODO this should probably pull the <updated> tag
         // and use that
-        let inserted_at = entry.inserted_at;
+        let inserted_at = entry_meta.inserted_at;
         text.push_str("Pulled date: ");
         text.push_str(inserted_at.to_string().as_str());
         text.push('\n');
     }
 
-    if let Some(read_at) = &entry.read_at {
+    if let Some(read_at) = &entry_meta.read_at {
         text.push_str("Read at: ");
         text.push_str(read_at.to_string().as_str());
         text.push('\n');
@@ -375,14 +375,14 @@ where
     }
 }
 
-fn draw_entry<B>(f: &mut Frame<B>, app: &AppImpl, entry: &Entry, area: Rect, scroll: u16)
+fn draw_entry<B>(f: &mut Frame<B>, app: &AppImpl, entry_meta: &EntryMeta, area: Rect, scroll: u16)
 where
     B: Backend,
 {
     let default_entry_title = "No entry title".to_string();
     let default_feed_title = "No feed title".to_string();
 
-    let entry_title = entry.title.as_ref().unwrap_or(&default_entry_title);
+    let entry_title = entry_meta.title.as_ref().unwrap_or(&default_entry_title);
 
     let feed_title = app
         .current_feed
