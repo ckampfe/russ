@@ -498,6 +498,16 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
     Ok(feeds)
 }
 
+pub fn get_feed_ids(conn: &rusqlite::Connection) -> Result<Vec<FeedId>> {
+    let mut statement = conn.prepare("SELECT id FROM feeds ORDER BY lower(title) ASC")?;
+    let mut ids = vec![];
+    for id in statement.query_map(NO_PARAMS, |row| Ok(row.get(0)?))? {
+        ids.push(id?)
+    }
+
+    Ok(ids)
+}
+
 pub fn get_entry_meta(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<EntryMeta> {
     let result = conn.query_row(
         "SELECT 

@@ -281,12 +281,7 @@ impl App {
 
     pub fn feed_ids(&self) -> Result<Vec<crate::rss::FeedId>> {
         let inner = self.inner.lock().unwrap();
-
-        let ids = crate::rss::get_feeds(&inner.conn)?
-            .iter()
-            .map(|feed| feed.id)
-            .collect::<Vec<_>>();
-
+        let ids = crate::rss::get_feed_ids(&inner.conn)?;
         Ok(ids)
     }
 
