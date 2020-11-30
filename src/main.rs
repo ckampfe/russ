@@ -153,7 +153,7 @@ fn start_async_io(
                     match crate::rss::get_feeds(&conn) {
                         Ok(feeds) => {
                             {
-                                app.set_feed_subscription_input(String::new());
+                                app.reset_feed_subscription_input();
                                 app.set_feeds(feeds);
                                 app.select_feeds();
                                 app.update_current_feed_and_entries()?;

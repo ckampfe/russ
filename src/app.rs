@@ -235,9 +235,9 @@ impl App {
         inner.feed_subscription_input.clone()
     }
 
-    pub fn set_feed_subscription_input(&self, feed_subscription_input: String) {
+    pub fn reset_feed_subscription_input(&self) {
         let mut inner = self.inner.lock().unwrap();
-        inner.feed_subscription_input = feed_subscription_input;
+        inner.feed_subscription_input.clear();
     }
 
     pub fn push_feed_subscription_input(&self, input: char) {
