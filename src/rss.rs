@@ -5,6 +5,7 @@ use chrono::prelude::*;
 use rss::Channel;
 use rusqlite::{params, ToSql, NO_PARAMS};
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::str::FromStr;
 
 type EntryId = i64;
@@ -26,12 +27,14 @@ impl rusqlite::types::FromSql for FeedKind {
     }
 }
 
-impl ToString for FeedKind {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Atom => "Atom".to_string(),
-            Self::RSS => "RSS".to_string(),
-        }
+impl Display for FeedKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let out = match self {
+            FeedKind::Atom => "Atom",
+            FeedKind::RSS => "RSS",
+        };
+
+        write!(f, "{}", out)
     }
 }
 
