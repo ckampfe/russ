@@ -87,7 +87,8 @@ fn start_async_io(
 
                 if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
                     .with_context(|| {
-                        let feed_url = crate::rss::get_feed_url(&conn, feed_id).unwrap();
+                        let feed_url = crate::rss::get_feed_url(&conn, feed_id)
+                            .expect(&format!("Unable to get feed URL for feed_id {}", feed_id));
 
                         format!("Failed to fetch and refresh feed {}", feed_url)
                     })
@@ -113,8 +114,11 @@ fn start_async_io(
                             if let Err(e) =
                                 crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
                                     .with_context(|| {
-                                        let feed_url =
-                                            crate::rss::get_feed_url(&conn, feed_id).unwrap();
+                                        let feed_url = crate::rss::get_feed_url(&conn, feed_id)
+                                            .expect(&format!(
+                                                "Unable to get feed URL for feed_id {}",
+                                                feed_id
+                                            ));
 
                                         format!("Failed to fetch and refresh feed {}", feed_url)
                                     })
@@ -184,7 +188,8 @@ fn clear_flash_after(sx: &mpsc::Sender<IOCommand>, duration: &time::Duration) {
     let duration = *duration;
     thread::spawn(move || {
         thread::sleep(duration);
-        sx.send(IOCommand::ClearFlash).unwrap();
+        sx.send(IOCommand::ClearFlash)
+            .expect("Unable to send IOCommand::ClearFlash");
     });
 }
 
@@ -209,13 +214,16 @@ fn main() -> Result<()> {
         let mut last_tick = time::Instant::now();
         loop {
             // poll for tick rate duration, if no events, sent tick event.
-            if event::poll(tick_rate - last_tick.elapsed()).unwrap() {
-                if let CEvent::Key(key) = event::read().unwrap() {
-                    tx.send(Event::Input(key)).unwrap();
+            if event::poll(tick_rate - last_tick.elapsed())
+                .expect("Unable to poll for Crossterm event")
+            {
+                if let CEvent::Key(key) = event::read().expect("Unable to read Crossterm event") {
+                    tx.send(Event::Input(key))
+                        .expect("Unable to send Crossterm Key input event");
                 }
             }
             if last_tick.elapsed() >= tick_rate {
-                tx.send(Event::Tick).unwrap();
+                tx.send(Event::Tick).expect("Unable to send tick");
                 last_tick = time::Instant::now();
             }
         }
@@ -304,7 +312,9 @@ fn main() -> Result<()> {
         }
     }
 
-    io_thread.join().unwrap()?;
+    io_thread
+        .join()
+        .expect("Unable to join IO thread to main thread")?;
 
     Ok(())
 }

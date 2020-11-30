@@ -316,7 +316,14 @@ where
         .entries
         .items
         .iter()
-        .map(|entry| ListItem::new(Span::raw(entry.title.as_ref().unwrap())))
+        .map(|entry| {
+            ListItem::new(Span::raw(
+                entry
+                    .title
+                    .as_ref()
+                    .expect(&format!("Unable to get title for entry id {}", entry.id)),
+            ))
+        })
         .collect::<Vec<ListItem>>();
 
     let default_title = "Entries".to_string();
