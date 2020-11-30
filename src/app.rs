@@ -106,7 +106,7 @@ impl App {
             Selected::Feeds => {
                 if !inner.entries.items.is_empty() {
                     inner.selected = Selected::Entries;
-                    inner.entries.state.select(Some(0));
+                    inner.entries.reset();
                     inner.update_current_entry_meta()?;
                 }
                 Ok(())
@@ -190,9 +190,9 @@ impl App {
         inner.update_current_entries()?;
 
         if !inner.entries.items.is_empty() {
-            inner.entries.state.select(Some(0));
+            inner.entries.reset();
         } else {
-            inner.entries.state.select(None);
+            inner.entries.unselect();
         }
 
         inner.update_current_entry_meta()?;
@@ -356,10 +356,10 @@ impl AppImpl {
             .build()?;
 
         crate::rss::initialize_db(&conn)?;
-        let initial_feed_titles = vec![].into();
+        let feeds: util::StatefulList<crate::rss::Feed> = vec![].into();
+        let entries: util::StatefulList<crate::rss::EntryMeta> = vec![].into();
         let selected = Selected::Feeds;
         let initial_current_feed = None;
-        let initial_entries = vec![].into();
 
         let mut app = AppImpl {
             conn,
@@ -367,8 +367,8 @@ impl AppImpl {
             line_length: options.line_length,
             should_quit: false,
             error_flash: vec![],
-            feeds: initial_feed_titles,
-            entries: initial_entries,
+            feeds,
+            entries,
             selected,
             entry_scroll_position: 0,
             entry_lines_len: 0,
@@ -408,7 +408,7 @@ impl AppImpl {
             let selected_idx = match self.feeds.state.selected() {
                 Some(idx) => idx,
                 None => {
-                    self.feeds.state.select(Some(0));
+                    self.feeds.reset();
                     0
                 }
             };
@@ -439,7 +439,7 @@ impl AppImpl {
         } else {
             match self.entries.items.len().checked_sub(1) {
                 Some(n) => self.entries.state.select(Some(n)),
-                None => self.entries.state.select(Some(0)),
+                None => self.entries.reset(),
             }
         }
         Ok(())

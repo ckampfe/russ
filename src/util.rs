@@ -7,13 +7,6 @@ pub struct StatefulList<T> {
 }
 
 impl<T> StatefulList<T> {
-    // pub fn new() -> StatefulList<T> {
-    //     StatefulList {
-    //         state: ListState::default(),
-    //         items: Vec::new(),
-    //     }
-    // }
-
     pub fn with_items(items: Vec<T>) -> StatefulList<T> {
         StatefulList {
             state: ListState::default(),
@@ -49,9 +42,13 @@ impl<T> StatefulList<T> {
         self.state.select(Some(i));
     }
 
-    // pub fn unselect(&mut self) {
-    //     self.state.select(None);
-    // }
+    pub fn reset(&mut self) {
+        self.state.select(Some(0));
+    }
+
+    pub fn unselect(&mut self) {
+        self.state.select(None);
+    }
 }
 
 impl<T> From<Vec<T>> for StatefulList<T> {
