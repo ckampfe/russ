@@ -59,7 +59,7 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
 enum IOCommand {
     Break,
     RefreshFeed(crate::rss::FeedId),
-    RefreshAllFeeds(Vec<crate::rss::FeedId>),
+    RefreshFeeds(Vec<crate::rss::FeedId>),
     SubscribeToFeed(String),
     ClearFlash,
 }
@@ -101,7 +101,7 @@ fn start_async_io(
                     clear_flash_after(&sx, &options.flash_display_duration_seconds);
                 };
             }
-            RefreshAllFeeds(feed_ids) => {
+            RefreshFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
 
                 app.set_flash("Refreshing all feeds...".to_string());
@@ -271,8 +271,7 @@ fn main() -> Result<()> {
                     },
                     (KeyCode::Char('x'), KeyModifiers::NONE) => {
                         let feed_ids = app.feed_ids()?;
-
-                        io_s.send(IOCommand::RefreshAllFeeds(feed_ids))?;
+                        io_s.send(IOCommand::RefreshFeeds(feed_ids))?;
                     }
                     (KeyCode::Char('?'), _) => app.toggle_help()?,
                     (KeyCode::Char(c), KeyModifiers::NONE) => app.on_key(c)?,
