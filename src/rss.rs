@@ -434,7 +434,7 @@ pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
         |row| {
             let feed_kind_str: String = row.get(4)?;
             let feed_kind: FeedKind = FeedKind::from_str(&feed_kind_str)
-                .expect(&format!("FeedKind must be Atom or RSS, got {}", feed_kind_str));
+                .unwrap_or_else(|_| panic!("FeedKind must be Atom or RSS, got {}", feed_kind_str));
 
             Ok(Feed {
                 id: row.get(0)?,

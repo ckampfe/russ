@@ -87,8 +87,10 @@ fn start_async_io(
 
                 if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
                     .with_context(|| {
-                        let feed_url = crate::rss::get_feed_url(&conn, feed_id)
-                            .expect(&format!("Unable to get feed URL for feed_id {}", feed_id));
+                        let feed_url =
+                            crate::rss::get_feed_url(&conn, feed_id).unwrap_or_else(|_| {
+                                panic!("Unable to get feed URL for feed_id {}", feed_id)
+                            });
 
                         format!("Failed to fetch and refresh feed {}", feed_url)
                     })
@@ -115,10 +117,12 @@ fn start_async_io(
                                 crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
                                     .with_context(|| {
                                         let feed_url = crate::rss::get_feed_url(&conn, feed_id)
-                                            .expect(&format!(
-                                                "Unable to get feed URL for feed_id {}",
-                                                feed_id
-                                            ));
+                                            .unwrap_or_else(|_| {
+                                                panic!(
+                                                    "Unable to get feed URL for feed_id {}",
+                                                    feed_id
+                                                )
+                                            });
 
                                         format!("Failed to fetch and refresh feed {}", feed_url)
                                     })
