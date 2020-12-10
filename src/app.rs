@@ -142,6 +142,16 @@ impl App {
         inner.on_enter()
     }
 
+    pub fn page_up(&self) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.page_up()
+    }
+
+    pub fn page_down(&self) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.page_down()
+    }
+
     pub fn toggle_help(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.toggle_help()
@@ -331,6 +341,7 @@ pub struct AppImpl {
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
     pub entry_lines_len: usize,
+    pub entry_lines_rendered_len: u16,
     // modes
     pub should_quit: bool,
     pub selected: Selected,
@@ -367,6 +378,7 @@ impl AppImpl {
             selected,
             entry_scroll_position: 0,
             entry_lines_len: 0,
+            entry_lines_rendered_len: 0,
             current_entry_meta: None,
             current_entry_text: String::new(),
             current_feed: initial_current_feed,
@@ -469,6 +481,36 @@ impl AppImpl {
             let entry_meta = entry_meta?;
             self.current_entry_meta = Some(entry_meta);
         }
+        Ok(())
+    }
+
+    fn page_up(&mut self) -> Result<()> {
+        if matches!(self.selected, Selected::Entry(_)) {
+            self.entry_scroll_position = if let Some(position) = self
+                .entry_scroll_position
+                .checked_sub(self.entry_lines_rendered_len)
+            {
+                position
+            } else {
+                0
+            };
+        };
+
+        Ok(())
+    }
+
+    fn page_down(&mut self) -> Result<()> {
+        if matches!(self.selected, Selected::Entry(_)) {
+            self.entry_scroll_position = if self.entry_scroll_position
+                + self.entry_lines_rendered_len
+                >= self.entry_lines_len as u16
+            {
+                self.entry_lines_len as u16
+            } else {
+                self.entry_scroll_position + self.entry_lines_rendered_len
+            };
+        }
+
         Ok(())
     }
 

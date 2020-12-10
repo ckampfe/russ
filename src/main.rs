@@ -285,6 +285,8 @@ fn main() -> Result<()> {
                         let feed_ids = app.feed_ids()?;
                         io_s.send(IOCommand::RefreshFeeds(feed_ids))?;
                     }
+                    (KeyCode::PageUp, _) => app.page_up()?,
+                    (KeyCode::PageDown, _) => app.page_down()?,
                     (KeyCode::Char('?'), _) => app.toggle_help()?,
                     (KeyCode::Char(c), KeyModifiers::NONE) => app.on_key(c)?,
                     (KeyCode::Left, _) => app.on_left()?,

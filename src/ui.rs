@@ -20,14 +20,11 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
     draw_info_column(f, chunks[0], app);
 
     match &app.selected {
-        Selected::Feeds => {
+        Selected::Feeds | Selected::Entries => {
             draw_entries(f, chunks[1], app);
         }
-        Selected::Entries => {
-            draw_entries(f, chunks[1], app);
-        }
-        Selected::Entry(entry_meta) => {
-            draw_entry(f, app, &entry_meta, chunks[1], app.entry_scroll_position);
+        Selected::Entry(_entry_meta) => {
+            draw_entry(f, chunks[1], app);
         }
     }
 }
@@ -379,10 +376,16 @@ where
     }
 }
 
-fn draw_entry<B>(f: &mut Frame<B>, app: &AppImpl, entry_meta: &EntryMeta, area: Rect, scroll: u16)
+fn draw_entry<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
 where
     B: Backend,
 {
+    let scroll = app.entry_scroll_position;
+    let entry_meta = if let Selected::Entry(e) = &app.selected {
+        e
+    } else {
+        panic!("draw_entry should only be called when app.selected was Selected::Entry")
+    };
     let default_entry_title = "No entry title".to_string();
     let default_feed_title = "No feed title".to_string();
 
@@ -418,6 +421,8 @@ where
 
     let real_entry_chunk_height =
         (entry_chunk_height as f32 * (entry_percent / 100.0)).floor() as u16;
+
+    app.entry_lines_rendered_len = real_entry_chunk_height;
 
     let percent = if app.entry_lines_len > 0 {
         let furthest_visible_position = app.entry_scroll_position + real_entry_chunk_height;

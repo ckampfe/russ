@@ -160,6 +160,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] add a network timeout for fetching new rss/atom entries (default: 5 seconds)
 - [x] show scroll progress for an entry
 - [x] show/hide help with `?`
+- [x] page-down/page-up entry scrolling
 
 ## license
 
