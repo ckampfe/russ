@@ -224,7 +224,7 @@ impl FromStr for FeedAndEntries {
 }
 
 pub fn subscribe_to_feed(
-    http_client: &reqwest::blocking::Client,
+    http_client: &ureq::Agent,
     conn: &rusqlite::Connection,
     url: &str,
 ) -> Result<FeedId> {
@@ -235,8 +235,8 @@ pub fn subscribe_to_feed(
     Ok(feed_id)
 }
 
-fn fetch_feed(http_client: &reqwest::blocking::Client, url: &str) -> Result<FeedAndEntries> {
-    let resp = http_client.get(url).send()?.text()?;
+fn fetch_feed(http_client: &ureq::Agent, url: &str) -> Result<FeedAndEntries> {
+    let resp = http_client.get(url).call()?.into_string()?;
     let mut feed = FeedAndEntries::from_str(&resp)?;
     feed.set_feed_link(url);
 
@@ -247,7 +247,7 @@ fn fetch_feed(http_client: &reqwest::blocking::Client, url: &str) -> Result<Feed
 /// uses the link as the uniqueness key.
 /// TODO hash the content to see if anything changed, and update that way.
 pub fn refresh_feed(
-    client: &reqwest::blocking::Client,
+    client: &ureq::Agent,
     conn: &rusqlite::Connection,
     feed_id: FeedId,
 ) -> Result<()> {
@@ -646,20 +646,18 @@ mod tests {
 
     #[test]
     fn it_fetches() {
-        let http_client = reqwest::blocking::ClientBuilder::default()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-            .unwrap();
+        let http_client = ureq::AgentBuilder::new()
+            .timeout_read(std::time::Duration::from_secs(5))
+            .build();
         let feed_and_entries = fetch_feed(&http_client, ZCT).unwrap();
         assert!(feed_and_entries.entries.len() > 0)
     }
 
     #[test]
     fn it_subscribes_to_a_feed() {
-        let http_client = reqwest::blocking::ClientBuilder::default()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-            .unwrap();
+        let http_client = ureq::AgentBuilder::new()
+            .timeout_read(std::time::Duration::from_secs(5))
+            .build();
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
         subscribe_to_feed(&http_client, &conn, ZCT).unwrap();
@@ -672,10 +670,9 @@ mod tests {
 
     #[test]
     fn refresh_feed_does_not_add_any_items_if_there_are_no_new_items() {
-        let http_client = reqwest::blocking::ClientBuilder::default()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-            .unwrap();
+        let http_client = ureq::AgentBuilder::new()
+            .timeout_read(std::time::Duration::from_secs(5))
+            .build();
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
         subscribe_to_feed(&http_client, &conn, ZCT).unwrap();

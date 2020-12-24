@@ -319,7 +319,8 @@ impl App {
         Ok(())
     }
 
-    pub fn http_client(&self) -> reqwest::blocking::Client {
+    pub fn http_client(&self) -> ureq::Agent {
+        // this is cheap because it only clones a struct containing two Arcs
         self.inner.lock().unwrap().http_client.clone()
     }
 }
@@ -329,7 +330,7 @@ pub struct AppImpl {
     // database stuff
     pub conn: rusqlite::Connection,
     // network stuff
-    pub http_client: reqwest::blocking::Client,
+    pub http_client: ureq::Agent,
     // feed stuff
     pub current_feed: Option<crate::rss::Feed>,
     pub feeds: util::StatefulList<crate::rss::Feed>,
@@ -357,9 +358,10 @@ pub struct AppImpl {
 impl AppImpl {
     pub fn new(options: crate::Options) -> Result<AppImpl> {
         let conn = rusqlite::Connection::open(&options.database_path)?;
-        let http_client = reqwest::blocking::ClientBuilder::default()
-            .timeout(options.network_timeout)
-            .build()?;
+
+        let http_client = ureq::AgentBuilder::new()
+            .timeout_read(options.network_timeout)
+            .build();
 
         crate::rss::initialize_db(&conn)?;
         let feeds: util::StatefulList<crate::rss::Feed> = vec![].into();

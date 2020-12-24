@@ -17,11 +17,11 @@ html2text = "0.2"
 r2d2 = "0.8"
 r2d2_sqlite = "0.17"
 rayon = "1.5"
-reqwest = { version = "0.10", features = ["blocking"] }
 rss = { git = "https://github.com/rust-syndication/rss", rev = "549f219" }
 rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3"
 tui = { version = "0.13", default-features = false, features = ["crossterm"] }
+ureq = "2.0.0-rc4"
 
 [profile.release]
 codegen-units = 1
