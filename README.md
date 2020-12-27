@@ -16,7 +16,11 @@ See the [license](LICENSE) if you're curious about that kind of thing.
 ```
 $ git clone
 $ cd russ
+# note that on linux, you will need these system dependencies as well, for example:
+$ sudo apt update && sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev
+# install the russ binary
 $ cargo install --path .
+# launch russ with default configuration
 $ russ -d"your_db_name.db"
 ```
 
@@ -130,6 +134,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
 - [ ] deleting feeds
+- [ ] automatic line length for wrapping
 
 ### done
 
