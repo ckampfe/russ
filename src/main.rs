@@ -258,6 +258,10 @@ fn main() -> Result<()> {
         match mode {
             Mode::Normal => match rx.recv()? {
                 Event::Input(event) => match (event.code, event.modifiers) {
+                    // These first few keycodes are handled inline
+                    // because they talk to either the IO thread or the terminal.
+                    // All other keycodes are handled in the final `on_key`
+                    // wildcard pattern, as they do neither.
                     (KeyCode::Char('q'), _)
                     | (KeyCode::Char('c'), KeyModifiers::CONTROL)
                     | (KeyCode::Esc, _) => {
@@ -282,16 +286,16 @@ fn main() -> Result<()> {
                         let feed_ids = app.feed_ids()?;
                         io_s.send(IOCommand::RefreshFeeds(feed_ids))?;
                     }
-                    (KeyCode::PageUp, _) => app.page_up()?,
-                    (KeyCode::PageDown, _) => app.page_down()?,
-                    (KeyCode::Char('?'), _) => app.toggle_help()?,
-                    (KeyCode::Char(c), KeyModifiers::NONE) => app.on_key(c)?,
-                    (KeyCode::Left, _) => app.on_left()?,
-                    (KeyCode::Up, _) => app.on_up()?,
-                    (KeyCode::Right, _) => app.on_right()?,
-                    (KeyCode::Down, _) => app.on_down()?,
-                    (KeyCode::Enter, _) => app.on_enter()?,
-                    _ => {}
+                    // handle all other normal-mode keycodes here
+                    (keycode, modifiers) => {
+                        // Manually match out the on_key result here
+                        // and show errors in the error flash,
+                        // because these on_key actions can fail
+                        // in such a way that the app can continue.
+                        if let Err(e) = app.on_key(keycode, modifiers) {
+                            app.push_error_flash(e);
+                        }
+                    }
                 },
                 Event::Tick => (),
             },

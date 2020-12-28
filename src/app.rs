@@ -2,6 +2,7 @@ use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
+use crossterm::event::{KeyCode, KeyModifiers};
 use std::sync::{Arc, Mutex};
 use tui::{backend::CrosstermBackend, Terminal};
 
@@ -48,20 +49,25 @@ impl App {
         self.inner.lock().unwrap().mode
     }
 
-    pub fn on_key(&self, c: char) -> Result<()> {
-        match c {
-            // vim-style movement
-            'h' => self.on_left(),
-            'j' => self.on_down(),
-            'k' => self.on_up(),
-            'l' => self.on_right(),
-            'a' => self.toggle_read_mode(),
-            'e' | 'i' => {
+    pub fn on_key(&self, keycode: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+        match (keycode, modifiers) {
+            // movement
+            (KeyCode::Left, _) | (KeyCode::Char('h'), _) => self.on_left(),
+            (KeyCode::Down, _) | (KeyCode::Char('j'), _) => self.on_down(),
+            (KeyCode::Up, _) | (KeyCode::Char('k'), _) => self.on_up(),
+            (KeyCode::Right, _) | (KeyCode::Char('l'), _) => self.on_right(),
+            (KeyCode::PageUp, _) => self.page_up(),
+            (KeyCode::PageDown, _) => self.page_down(),
+            // modes, selections, editing, etc.
+            (KeyCode::Enter, _) => self.on_enter(),
+            (KeyCode::Char('?'), _) => self.toggle_help(),
+            (KeyCode::Char('a'), _) => self.toggle_read_mode(),
+            (KeyCode::Char('e'), _) | (KeyCode::Char('i'), _) => {
                 let mut inner = self.inner.lock().unwrap();
                 inner.mode = Mode::Editing;
                 Ok(())
             }
-            'c' => self.put_current_link_in_clipboard(),
+            (KeyCode::Char('c'), _) => self.put_current_link_in_clipboard(),
             _ => Ok(()),
         }
     }
@@ -177,7 +183,7 @@ impl App {
     }
 
     fn put_current_link_in_clipboard(&self) -> Result<()> {
-        let mut ctx = ClipboardContext::new().unwrap();
+        let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
 
         let inner = self.inner.lock().unwrap();
 
