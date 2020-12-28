@@ -77,13 +77,14 @@ Press `q` or `Esc` to quit Russ.
 `r` - mark entry as read (context dependent)
 `a` - view read/unread entries
 `x` - refresh all feeds
+`c` - copy current entry link or feed link to clipboard (depending on selection)
 `Esc` - go from insert mode to normal mode
 
 ## help/options/config
 
 ```
-clark@doomguy:~/code/personal/russ$ russ -h
-russ ab089c0
+$ russ -h
+russ eae8d47
 
 USAGE:
     russ [OPTIONS] --database-path <database-path>
