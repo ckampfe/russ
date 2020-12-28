@@ -40,9 +40,6 @@ pub struct Options {
     /// time in ms between two ticks
     #[structopt(short, long, default_value = "250")]
     tick_rate: u64,
-    /// maximum line length for entries
-    #[structopt(short, long, default_value = "90")]
-    line_length: usize,
     /// number of seconds to show the flash message before clearing it
     #[structopt(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
     flash_display_duration_seconds: time::Duration,

@@ -17,12 +17,31 @@ impl App {
         })
     }
 
-    pub fn draw(
-        &self,
-        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> std::io::Result<()> {
+    pub fn draw(&self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        terminal.draw(|mut f| crate::ui::draw(&mut f, &mut inner))
+        terminal
+            .draw(|mut f| {
+                let chunks = crate::ui::predraw(f);
+
+                assert!(
+                    chunks.len() >= 2,
+                    "There must be at least two chunks in order to draw two columns"
+                );
+
+                let new_width = chunks[1].width;
+
+                if inner.entry_column_width != new_width {
+                    inner.entry_column_width = new_width;
+                    inner.on_enter().unwrap_or_else(|e| {
+                        inner.error_flash = vec![e];
+                    })
+                }
+
+                inner.entry_column_width = chunks[1].width;
+
+                crate::ui::draw(&mut f, chunks, &mut inner);
+            })
+            .map_err(|e| e.into())
     }
 
     pub fn mode(&self) -> Mode {
@@ -337,12 +356,12 @@ pub struct AppImpl {
     // entry stuff
     pub current_entry_meta: Option<crate::rss::EntryMeta>,
     pub entries: util::StatefulList<crate::rss::EntryMeta>,
-    pub line_length: usize,
     pub entry_selection_position: usize,
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
     pub entry_lines_len: usize,
     pub entry_lines_rendered_len: u16,
+    pub entry_column_width: u16,
     // modes
     pub should_quit: bool,
     pub selected: Selected,
@@ -372,7 +391,6 @@ impl AppImpl {
         let mut app = AppImpl {
             conn,
             http_client,
-            line_length: options.line_length,
             should_quit: false,
             error_flash: vec![],
             feeds,
@@ -381,6 +399,7 @@ impl AppImpl {
             entry_scroll_position: 0,
             entry_lines_len: 0,
             entry_lines_rendered_len: 0,
+            entry_column_width: 0,
             current_entry_meta: None,
             current_entry_text: String::new(),
             current_feed: initial_current_feed,
@@ -518,7 +537,7 @@ impl AppImpl {
 
     pub fn on_enter(&mut self) -> Result<()> {
         match self.selected {
-            Selected::Entries => {
+            Selected::Entries | Selected::Entry(_) => {
                 if !self.entries.items.is_empty() {
                     if let Some(entry_meta) = &self.current_entry_meta {
                         if let Some(entry) = self.get_selected_entry() {
@@ -538,8 +557,16 @@ impl AppImpl {
                                 .or_else(|| entry.description.as_ref())
                                 .or(Some(&empty_string));
 
+                            // minimum is 1
+                            let line_length = if self.entry_column_width >= 5 {
+                                self.entry_column_width - 4
+                            } else {
+                                1
+                            };
+
                             if let Some(html) = entry_html {
-                                let text = html2text::from_read(html.as_bytes(), self.line_length);
+                                let text =
+                                    html2text::from_read(html.as_bytes(), line_length.into());
                                 self.entry_lines_len = text.matches('\n').count();
                                 self.current_entry_text = text;
                             } else {

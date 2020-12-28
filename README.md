@@ -1,6 +1,6 @@
 # russ
 
-Russ is a really simple RSS/Atom reader with vim-like controls and an offline-first focus.
+Russ is a TUI RSS/Atom reader with vim-like controls and an offline-first focus.
 
 See the [license](LICENSE) if you're curious about that kind of thing.
 
@@ -82,8 +82,8 @@ Press `q` or `Esc` to quit Russ.
 ## help/options/config
 
 ```
-$ russ -h
-russ 0aad340
+clark@doomguy:~/code/personal/russ$ russ -h
+russ ab089c0
 
 USAGE:
     russ [OPTIONS] --database-path <database-path>
@@ -96,9 +96,6 @@ OPTIONS:
     -d, --database-path <database-path>                                      feed database path
     -f, --flash-display-duration-seconds <flash-display-duration-seconds>
             number of seconds to show the flash message before clearing it [default: 4]
-
-    -l, --line-length <line-length>
-            maximum line length for entries [default: 90]
 
     -n, --network-timeout <network-timeout>
             RSS/Atom network request timeout in seconds [default: 5]
@@ -134,7 +131,6 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
 - [ ] deleting feeds
-- [ ] automatic line length for wrapping
 
 ### done
 
@@ -166,6 +162,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] show scroll progress for an entry
 - [x] show/hide help with `?`
 - [x] page-down/page-up entry scrolling
+- [x] automatic line length for wrapping
 
 ## license
 

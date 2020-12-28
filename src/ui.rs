@@ -11,12 +11,14 @@ use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::rss::EntryMeta;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut AppImpl) {
-    let chunks = Layout::default()
+pub fn predraw<B: Backend>(f: &Frame<B>) -> Vec<Rect> {
+    Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .direction(Direction::Horizontal)
-        .split(f.size());
+        .split(f.size())
+}
 
+pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Vec<Rect>, app: &mut AppImpl) {
     draw_info_column(f, chunks[0], app);
 
     match &app.selected {
