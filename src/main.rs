@@ -3,20 +3,20 @@
 use crate::modes::*;
 use anyhow::{Context, Result};
 use app::App;
-use crossterm::{
-    event::{self, Event as CEvent, KeyCode, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use crossterm::event;
+use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use rayon::prelude::*;
-use std::{
-    io::{stdout, Write},
-    path::PathBuf,
-    sync::mpsc,
-    thread, time,
-};
+use std::io::{stdout, Write};
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::{thread, time};
 use structopt::*;
-use tui::{backend::CrosstermBackend, Terminal};
+use tui::backend::CrosstermBackend;
+use tui::Terminal;
 
 mod app;
 mod modes;
