@@ -21,7 +21,7 @@ rss = { git = "https://github.com/rust-syndication/rss", rev = "549f219" }
 rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3"
 tui = { version = "0.14", default-features = false, features = ["crossterm"] }
-ureq = "2.0.0-rc4"
+ureq = "2.0"
 
 [profile.release]
 codegen-units = 1
