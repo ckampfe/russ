@@ -39,10 +39,10 @@ impl App {
         (feed_ids, Result<Vec<crate::rss::FeedId>>),
         (feed_subscription_input, String),
         (http_client, ureq::Agent),
+        (mode, Mode),
         (put_current_link_in_clipboard, Result<()>),
         (selected, Selected),
         (selected_feed_id, crate::rss::FeedId),
-        (mode, Mode),
     ];
 
     delegate_to_locked_mut_inner![
