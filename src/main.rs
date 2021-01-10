@@ -232,7 +232,7 @@ fn main() -> Result<()> {
 
     let options_clone = options.clone();
 
-    let mut app = App::new(options)?;
+    let app = App::new(options)?;
 
     let cloned_app = app.clone();
 

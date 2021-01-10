@@ -6,12 +6,64 @@ use crossterm::event::{KeyCode, KeyModifiers};
 use std::sync::{Arc, Mutex};
 use tui::{backend::CrosstermBackend, Terminal};
 
+macro_rules! delegate_to_locked_inner {
+    ($(($fn_name:ident, $t:ty)),* $(,)? ) => {
+        $(
+            pub fn $fn_name(&self) -> $t {
+                let inner = self.inner.lock().unwrap();
+                inner.$fn_name()
+            }
+        )*
+    };
+}
+
+macro_rules! delegate_to_locked_mut_inner {
+    ($(($fn_name:ident, $t:ty)),* $(,)?) => {
+        $(
+            pub fn $fn_name(&self) -> $t {
+                let mut inner = self.inner.lock().unwrap();
+                inner.$fn_name()
+            }
+        )*
+    };
+}
+
 #[derive(Clone, Debug)]
 pub struct App {
     inner: Arc<Mutex<AppImpl>>,
 }
 
 impl App {
+    delegate_to_locked_inner![
+        (error_flash_is_empty, bool),
+        (feed_ids, Result<Vec<crate::rss::FeedId>>),
+        (feed_subscription_input, String),
+        (http_client, ureq::Agent),
+        (put_current_link_in_clipboard, Result<()>),
+        (selected, Selected),
+        (selected_feed_id, crate::rss::FeedId),
+        (mode, Mode),
+    ];
+
+    delegate_to_locked_mut_inner![
+        (clear_error_flash, ()),
+        (clear_flash, ()),
+        (on_down, Result<()>),
+        (on_enter, Result<()>),
+        (on_left, Result<()>),
+        (on_right, Result<()>),
+        (on_up, Result<()>),
+        (page_up, Result<()>),
+        (page_down, Result<()>),
+        (pop_feed_subscription_input, ()),
+        (reset_feed_subscription_input, ()),
+        (select_feeds, ()),
+        (toggle_help, Result<()>),
+        (toggle_read, Result<()>),
+        (toggle_read_mode, Result<()>),
+        (update_current_feed_and_entries, Result<()>),
+    ];
+
     pub fn new(options: crate::Options) -> Result<App> {
         Ok(App {
             inner: Arc::new(Mutex::new(AppImpl::new(options)?)),
@@ -45,10 +97,6 @@ impl App {
             .map_err(|e| e.into())
     }
 
-    pub fn mode(&self) -> Mode {
-        self.inner.lock().unwrap().mode
-    }
-
     pub fn on_key(&self, keycode: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         match (keycode, modifiers) {
             // movement
@@ -72,182 +120,9 @@ impl App {
         }
     }
 
-    pub fn on_up(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-
-        match inner.selected {
-            Selected::Feeds => {
-                inner.feeds.previous();
-                inner.update_current_feed_and_entries()?;
-            }
-            Selected::Entries => {
-                if !inner.entries.items.is_empty() {
-                    inner.entries.previous();
-                    inner.entry_selection_position = inner.entries.state.selected().unwrap();
-                    inner.update_current_entry_meta()?;
-                }
-            }
-            Selected::Entry(_) => {
-                if let Some(n) = inner.entry_scroll_position.checked_sub(1) {
-                    inner.entry_scroll_position = n
-                };
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn on_down(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-
-        match inner.selected {
-            Selected::Feeds => {
-                inner.feeds.next();
-                inner.update_current_feed_and_entries()?;
-            }
-            Selected::Entries => {
-                if !inner.entries.items.is_empty() {
-                    inner.entries.next();
-                    inner.entry_selection_position = inner.entries.state.selected().unwrap();
-                    inner.update_current_entry_meta()?;
-                }
-            }
-            Selected::Entry(_) => {
-                if let Some(n) = inner.entry_scroll_position.checked_add(1) {
-                    inner.entry_scroll_position = n
-                };
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn on_right(&self) -> Result<()> {
-        let selected = self.inner.lock().unwrap().selected.clone();
-
-        let mut inner = self.inner.lock().unwrap();
-
-        match selected {
-            Selected::Feeds => {
-                if !inner.entries.items.is_empty() {
-                    inner.selected = Selected::Entries;
-                    inner.entries.reset();
-                    inner.update_current_entry_meta()?;
-                }
-                Ok(())
-            }
-            Selected::Entries => inner.on_enter(),
-            Selected::Entry(_) => Ok(()),
-        }
-    }
-
-    pub fn on_left(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-
-        match inner.selected {
-            Selected::Feeds => (),
-            Selected::Entries => {
-                inner.entry_selection_position = 0;
-                inner.selected = Selected::Feeds
-            }
-            Selected::Entry(_) => {
-                inner.entry_scroll_position = 0;
-                inner.selected = {
-                    inner.current_entry_text = String::new();
-                    Selected::Entries
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn on_enter(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.on_enter()
-    }
-
-    pub fn page_up(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.page_up()
-    }
-
-    pub fn page_down(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.page_down()
-    }
-
-    pub fn toggle_help(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.toggle_help()
-    }
-
-    fn put_current_link_in_clipboard(&self) -> Result<()> {
-        let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
-
-        let inner = self.inner.lock().unwrap();
-
-        let clipboard_result = match &inner.selected {
-            Selected::Feeds => {
-                let feed = inner.current_feed.clone().unwrap();
-                let link = feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap());
-                ctx.set_contents(link)
-            }
-            Selected::Entries => {
-                let idx = inner.entry_selection_position;
-                let entry = &inner.entries.items[idx];
-                let link = entry.link.clone().unwrap_or_else(|| "".to_string());
-                ctx.set_contents(link)
-            }
-            Selected::Entry(e) => {
-                let link = e.link.clone().unwrap_or_else(|| "".to_string());
-                ctx.set_contents(link)
-            }
-        };
-
-        clipboard_result.map_err(|e| anyhow::anyhow!(e))
-    }
-
-    pub fn toggle_read_mode(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-
-        match (&inner.read_mode, &inner.selected) {
-            (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
-                inner.entry_selection_position = 0;
-                inner.read_mode = ReadMode::ShowUnread
-            }
-            (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
-                inner.entry_selection_position = 0;
-                inner.read_mode = ReadMode::ShowRead
-            }
-            _ => (),
-        }
-        inner.update_current_entries()?;
-
-        if !inner.entries.items.is_empty() {
-            inner.entries.reset();
-        } else {
-            inner.entries.unselect();
-        }
-
-        inner.update_current_entry_meta()?;
-
-        Ok(())
-    }
-
     pub fn set_flash(&self, flash: String) {
         let mut inner = self.inner.lock().unwrap();
         inner.flash = Some(flash)
-    }
-
-    pub fn clear_flash(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.flash = None
-    }
-
-    pub fn error_flash_is_empty(&self) -> bool {
-        let inner = self.inner.lock().unwrap();
-        inner.error_flash.is_empty()
     }
 
     pub fn push_error_flash(&self, e: anyhow::Error) {
@@ -255,24 +130,9 @@ impl App {
         inner.error_flash.push(e);
     }
 
-    pub fn clear_error_flash(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.error_flash = vec![];
-    }
-
     pub fn set_mode(&self, mode: Mode) {
         let mut inner = self.inner.lock().unwrap();
         inner.mode = mode;
-    }
-
-    pub fn feed_subscription_input(&self) -> String {
-        let inner = self.inner.lock().unwrap();
-        inner.feed_subscription_input.clone()
-    }
-
-    pub fn reset_feed_subscription_input(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.feed_subscription_input.clear();
     }
 
     pub fn push_feed_subscription_input(&self, input: char) {
@@ -280,73 +140,10 @@ impl App {
         inner.feed_subscription_input.push(input);
     }
 
-    pub fn pop_feed_subscription_input(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.feed_subscription_input.pop();
-    }
-
     pub fn set_feeds(&self, feeds: Vec<crate::rss::Feed>) {
         let mut inner = self.inner.lock().unwrap();
         let feeds = feeds.into();
         inner.feeds = feeds;
-    }
-
-    pub fn update_current_feed_and_entries(&self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.update_current_feed()?;
-        inner.update_current_entries()?;
-        Ok(())
-    }
-
-    pub fn select_feeds(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.selected = Selected::Feeds;
-    }
-
-    pub fn selected(&self) -> Selected {
-        let inner = self.inner.lock().unwrap();
-        inner.selected.clone()
-    }
-
-    pub fn selected_feed_id(&self) -> crate::rss::FeedId {
-        let feeds = &self.inner.lock().unwrap().feeds;
-        let selected_idx = feeds.state.selected().unwrap();
-        feeds.items[selected_idx].id
-    }
-
-    pub fn feed_ids(&self) -> Result<Vec<crate::rss::FeedId>> {
-        let inner = self.inner.lock().unwrap();
-        let ids = crate::rss::get_feed_ids(&inner.conn)?;
-        Ok(ids)
-    }
-
-    pub fn toggle_read(&mut self) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        let selected = inner.selected.clone();
-        match selected {
-            Selected::Entry(entry) => {
-                entry.toggle_read(&inner.conn)?;
-                inner.selected = Selected::Entries;
-                inner.update_current_entries()?;
-                inner.update_current_entry_meta()?;
-                inner.entry_scroll_position = 0;
-            }
-            Selected::Entries => {
-                if let Some(entry_meta) = &inner.current_entry_meta {
-                    entry_meta.toggle_read(&inner.conn)?;
-                    inner.update_current_entries()?;
-                    inner.update_current_entry_meta()?;
-                }
-            }
-            Selected::Feeds => (),
-        }
-
-        Ok(())
-    }
-
-    pub fn http_client(&self) -> ureq::Agent {
-        // this is cheap because it only clones a struct containing two Arcs
-        self.inner.lock().unwrap().http_client.clone()
     }
 }
 
@@ -593,5 +390,208 @@ impl AppImpl {
     pub fn toggle_help(&mut self) -> Result<()> {
         self.show_help = !self.show_help;
         Ok(())
+    }
+
+    pub fn clear_error_flash(&mut self) {
+        self.error_flash = vec![];
+    }
+
+    pub fn reset_feed_subscription_input(&mut self) {
+        self.feed_subscription_input.clear();
+    }
+
+    pub fn pop_feed_subscription_input(&mut self) {
+        self.feed_subscription_input.pop();
+    }
+
+    pub fn feed_subscription_input(&self) -> String {
+        self.feed_subscription_input.clone()
+    }
+
+    pub fn error_flash_is_empty(&self) -> bool {
+        self.error_flash.is_empty()
+    }
+
+    pub fn clear_flash(&mut self) {
+        self.flash = None
+    }
+
+    pub fn select_feeds(&mut self) {
+        self.selected = Selected::Feeds;
+    }
+
+    pub fn selected(&self) -> Selected {
+        self.selected.clone()
+    }
+
+    pub fn selected_feed_id(&self) -> crate::rss::FeedId {
+        let selected_idx = self.feeds.state.selected().unwrap();
+        self.feeds.items[selected_idx].id
+    }
+
+    pub fn feed_ids(&self) -> Result<Vec<crate::rss::FeedId>> {
+        let ids = crate::rss::get_feed_ids(&self.conn)?;
+        Ok(ids)
+    }
+
+    pub fn toggle_read(&mut self) -> Result<()> {
+        let selected = self.selected.clone();
+        match selected {
+            Selected::Entry(entry) => {
+                entry.toggle_read(&self.conn)?;
+                self.selected = Selected::Entries;
+                self.update_current_entries()?;
+                self.update_current_entry_meta()?;
+                self.entry_scroll_position = 0;
+            }
+            Selected::Entries => {
+                if let Some(entry_meta) = &self.current_entry_meta {
+                    entry_meta.toggle_read(&self.conn)?;
+                    self.update_current_entries()?;
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::Feeds => (),
+        }
+
+        Ok(())
+    }
+
+    pub fn http_client(&self) -> ureq::Agent {
+        // this is cheap because it only clones a struct containing two Arcs
+        self.http_client.clone()
+    }
+
+    pub fn toggle_read_mode(&mut self) -> Result<()> {
+        match (&self.read_mode, &self.selected) {
+            (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
+                self.entry_selection_position = 0;
+                self.read_mode = ReadMode::ShowUnread
+            }
+            (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
+                self.entry_selection_position = 0;
+                self.read_mode = ReadMode::ShowRead
+            }
+            _ => (),
+        }
+        self.update_current_entries()?;
+
+        if !self.entries.items.is_empty() {
+            self.entries.reset();
+        } else {
+            self.entries.unselect();
+        }
+
+        self.update_current_entry_meta()?;
+
+        Ok(())
+    }
+
+    fn put_current_link_in_clipboard(&self) -> Result<()> {
+        let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
+
+        let clipboard_result = match &self.selected {
+            Selected::Feeds => {
+                let feed = self.current_feed.clone().unwrap();
+                let link = feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap());
+                ctx.set_contents(link)
+            }
+            Selected::Entries => {
+                let idx = self.entry_selection_position;
+                let entry = &self.entries.items[idx];
+                let link = entry.link.clone().unwrap_or_else(|| "".to_string());
+                ctx.set_contents(link)
+            }
+            Selected::Entry(e) => {
+                let link = e.link.clone().unwrap_or_else(|| "".to_string());
+                ctx.set_contents(link)
+            }
+        };
+
+        clipboard_result.map_err(|e| anyhow::anyhow!(e))
+    }
+
+    pub fn on_left(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => (),
+            Selected::Entries => {
+                self.entry_selection_position = 0;
+                self.selected = Selected::Feeds
+            }
+            Selected::Entry(_) => {
+                self.entry_scroll_position = 0;
+                self.selected = {
+                    self.current_entry_text = String::new();
+                    Selected::Entries
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn on_up(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => {
+                self.feeds.previous();
+                self.update_current_feed_and_entries()?;
+            }
+            Selected::Entries => {
+                if !self.entries.items.is_empty() {
+                    self.entries.previous();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::Entry(_) => {
+                if let Some(n) = self.entry_scroll_position.checked_sub(1) {
+                    self.entry_scroll_position = n
+                };
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn on_right(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => {
+                if !self.entries.items.is_empty() {
+                    self.selected = Selected::Entries;
+                    self.entries.reset();
+                    self.update_current_entry_meta()?;
+                }
+                Ok(())
+            }
+            Selected::Entries => self.on_enter(),
+            Selected::Entry(_) => Ok(()),
+        }
+    }
+
+    pub fn on_down(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => {
+                self.feeds.next();
+                self.update_current_feed_and_entries()?;
+            }
+            Selected::Entries => {
+                if !self.entries.items.is_empty() {
+                    self.entries.next();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::Entry(_) => {
+                if let Some(n) = self.entry_scroll_position.checked_add(1) {
+                    self.entry_scroll_position = n
+                };
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 }
