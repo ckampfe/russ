@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-atom_syndication = { git = "https://github.com/rust-syndication/atom", rev = "48caa33", default-features = false }
+atom_syndication = { version = "0.9", default-features = false }
 chrono = "0.4"
 copypasta = "0.7"
 crossterm = "0.18"
@@ -17,7 +17,7 @@ html2text = "0.2"
 r2d2 = "0.8"
 r2d2_sqlite = "0.17"
 rayon = "1.5"
-rss = { git = "https://github.com/rust-syndication/rss", rev = "549f219" }
+rss = "1.10"
 rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3"
 tui = { version = "0.14", default-features = false, features = ["crossterm"] }

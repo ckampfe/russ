@@ -23,10 +23,12 @@ checksum = "ee67c11feeac938fae061b232e38e0b6d94f97a9df10e6271319325ac4c56a86"
 
 [[package]]
 name = "atom_syndication"
-version = "0.9.0"
-source = "git+https://github.com/rust-syndication/atom?rev=48caa33#48caa33be11f33ad543de29b2522c90766a5eaf9"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5016bf52ff4f3ed28bf3ec1fed96b53daf4b137d5e6b9f97a8cfae7b57a3a2"
 dependencies = [
  "chrono",
+ "derive_builder",
  "diligent-date-parser",
  "quick-xml",
 ]
@@ -994,9 +996,11 @@ dependencies = [
 
 [[package]]
 name = "rss"
-version = "1.9.0"
-source = "git+https://github.com/rust-syndication/rss?rev=549f219#549f219793a67c775c02e1f5af9f0d2e6ae64705"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e70d6ae72f8a4333af8ce9dce58942020528430eb0d46ee2fcb5e8d4d16377"
 dependencies = [
+ "atom_syndication",
  "derive_builder",
  "quick-xml",
 ]
@@ -1367,9 +1371,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "ureq"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e562326b32e3766fee6a4890b62489b4b095e94ac07232cfea631668002c19d7"
+checksum = "96014ded8c85822677daee4f909d18acccca744810fd4f8ffc492c284f2324bc"
 dependencies = [
  "base64",
  "chunked_transfer",
