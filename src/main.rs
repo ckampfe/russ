@@ -26,7 +26,7 @@ mod util;
 
 const RUSS_VERSION: &str = env!("RUSS_VERSION");
 
-enum Event<I> {
+pub enum Event<I> {
     Input(I),
     Tick,
 }
@@ -79,6 +79,7 @@ fn start_async_io(
                 let now = std::time::Instant::now();
 
                 app.set_flash("Refreshing feed...".to_string());
+                app.force_redraw()?;
 
                 let conn = pool.get()?;
 
@@ -97,6 +98,7 @@ fn start_async_io(
                     app.update_current_feed_and_entries()?;
                     let elapsed = now.elapsed();
                     app.set_flash(format!("Refreshed feed in {:?}", elapsed));
+                    app.force_redraw()?;
 
                     clear_flash_after(&sx, &options.flash_display_duration_seconds);
                 };
@@ -105,6 +107,7 @@ fn start_async_io(
                 let now = std::time::Instant::now();
 
                 app.set_flash("Refreshing all feeds...".to_string());
+                app.force_redraw()?;
 
                 feed_ids
                     .into_par_iter()
@@ -137,6 +140,7 @@ fn start_async_io(
 
                     let elapsed = now.elapsed();
                     app.set_flash(format!("Refreshed all feeds in {:?}", elapsed));
+                    app.force_redraw()?;
                 }
 
                 clear_flash_after(&sx, &options.flash_display_duration_seconds);
@@ -145,6 +149,7 @@ fn start_async_io(
                 let now = std::time::Instant::now();
 
                 app.set_flash("Subscribing to feed...".to_string());
+                app.force_redraw()?;
 
                 let conn = pool.get()?;
 
@@ -165,6 +170,7 @@ fn start_async_io(
 
                                 let elapsed = now.elapsed();
                                 app.set_flash(format!("Subscribed in {:?}", elapsed));
+                                app.force_redraw()?;
                             }
 
                             clear_flash_after(&sx, &options.flash_display_duration_seconds);
@@ -209,6 +215,7 @@ fn main() -> Result<()> {
 
     // Setup input handling
     let (tx, rx) = mpsc::channel();
+    let tx_clone = tx.clone();
 
     let tick_rate = time::Duration::from_millis(options.tick_rate);
     thread::spawn(move || {
@@ -232,7 +239,7 @@ fn main() -> Result<()> {
 
     let options_clone = options.clone();
 
-    let app = App::new(options)?;
+    let app = App::new(options, tx_clone)?;
 
     let cloned_app = app.clone();
 

@@ -38,6 +38,7 @@ impl App {
         (error_flash_is_empty, bool),
         (feed_ids, Result<Vec<crate::rss::FeedId>>),
         (feed_subscription_input, String),
+        (force_redraw, Result<()>),
         (http_client, ureq::Agent),
         (mode, Mode),
         (put_current_link_in_clipboard, Result<()>),
@@ -64,9 +65,12 @@ impl App {
         (update_current_feed_and_entries, Result<()>),
     ];
 
-    pub fn new(options: crate::Options) -> Result<App> {
+    pub fn new(
+        options: crate::Options,
+        event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+    ) -> Result<App> {
         Ok(App {
-            inner: Arc::new(Mutex::new(AppImpl::new(options)?)),
+            inner: Arc::new(Mutex::new(AppImpl::new(options, event_s)?)),
         })
     }
 
@@ -175,10 +179,14 @@ pub struct AppImpl {
     pub error_flash: Vec<anyhow::Error>,
     pub feed_subscription_input: String,
     pub flash: Option<String>,
+    event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
 }
 
 impl AppImpl {
-    pub fn new(options: crate::Options) -> Result<AppImpl> {
+    pub fn new(
+        options: crate::Options,
+        event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+    ) -> Result<AppImpl> {
         let conn = rusqlite::Connection::open(&options.database_path)?;
 
         let http_client = ureq::AgentBuilder::new()
@@ -212,6 +220,7 @@ impl AppImpl {
             show_help: true,
             entry_selection_position: 0,
             flash: None,
+            event_s,
         };
 
         app.update_feeds()?;
@@ -593,5 +602,9 @@ impl AppImpl {
 
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    pub fn force_redraw(&self) -> Result<()> {
+        self.event_s.send(crate::Event::Tick).map_err(|e| e.into())
     }
 }
