@@ -10,7 +10,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use rayon::prelude::*;
-use std::io::{stdout, Write};
+use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::{thread, time};

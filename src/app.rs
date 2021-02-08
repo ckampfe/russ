@@ -76,29 +76,30 @@ impl App {
 
     pub fn draw(&self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        terminal
-            .draw(|mut f| {
-                let chunks = crate::ui::predraw(f);
 
-                assert!(
-                    chunks.len() >= 2,
-                    "There must be at least two chunks in order to draw two columns"
-                );
+        terminal.draw(|mut f| {
+            let chunks = crate::ui::predraw(f);
 
-                let new_width = chunks[1].width;
+            assert!(
+                chunks.len() >= 2,
+                "There must be at least two chunks in order to draw two columns"
+            );
 
-                if inner.entry_column_width != new_width {
-                    inner.entry_column_width = new_width;
-                    inner.on_enter().unwrap_or_else(|e| {
-                        inner.error_flash = vec![e];
-                    })
-                }
+            let new_width = chunks[1].width;
 
-                inner.entry_column_width = chunks[1].width;
+            if inner.entry_column_width != new_width {
+                inner.entry_column_width = new_width;
+                inner.on_enter().unwrap_or_else(|e| {
+                    inner.error_flash = vec![e];
+                })
+            }
 
-                crate::ui::draw(&mut f, chunks, &mut inner);
-            })
-            .map_err(|e| e.into())
+            inner.entry_column_width = chunks[1].width;
+
+            crate::ui::draw(&mut f, chunks, &mut inner);
+        })?;
+
+        Ok(())
     }
 
     pub fn on_key(&self, keycode: KeyCode, modifiers: KeyModifiers) -> Result<()> {

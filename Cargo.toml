@@ -11,7 +11,7 @@ anyhow = "1.0"
 atom_syndication = { version = "0.9", default-features = false }
 chrono = "0.4"
 copypasta = "0.7"
-crossterm = "0.18"
+crossterm = "0.19"
 diligent-date-parser = "0.1"
 html2text = "0.2"
 r2d2 = "0.8"
@@ -20,7 +20,7 @@ rayon = "1.5"
 rss = "1.10"
 rusqlite = { version = "0.24", features = ["chrono"] }
 structopt = "0.3"
-tui = { version = "0.14", default-features = false, features = ["crossterm"] }
+tui = { git = "https://github.com/fdehau/tui-rs", rev = "8832281", default-features = false, features = ["crossterm"] }
 ureq = "2.0"
 
 [profile.release]
