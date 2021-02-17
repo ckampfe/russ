@@ -54,8 +54,8 @@ impl App {
         (on_left, Result<()>),
         (on_right, Result<()>),
         (on_up, Result<()>),
-        (page_up, Result<()>),
-        (page_down, Result<()>),
+        (page_up, ()),
+        (page_down, ()),
         (pop_feed_subscription_input, ()),
         (reset_feed_subscription_input, ()),
         (select_feeds, ()),
@@ -109,8 +109,14 @@ impl App {
             (KeyCode::Down, _) | (KeyCode::Char('j'), _) => self.on_down(),
             (KeyCode::Up, _) | (KeyCode::Char('k'), _) => self.on_up(),
             (KeyCode::Right, _) | (KeyCode::Char('l'), _) => self.on_right(),
-            (KeyCode::PageUp, _) => self.page_up(),
-            (KeyCode::PageDown, _) => self.page_down(),
+            (KeyCode::PageUp, _) => {
+                self.page_up();
+                Ok(())
+            }
+            (KeyCode::PageDown, _) => {
+                self.page_down();
+                Ok(())
+            }
             // modes, selections, editing, etc.
             (KeyCode::Enter, _) => self.on_enter(),
             (KeyCode::Char('?'), _) => self.toggle_help(),
@@ -318,7 +324,7 @@ impl AppImpl {
         Ok(())
     }
 
-    fn page_up(&mut self) -> Result<()> {
+    fn page_up(&mut self) {
         if matches!(self.selected, Selected::Entry(_)) {
             self.entry_scroll_position = if let Some(position) = self
                 .entry_scroll_position
@@ -329,11 +335,9 @@ impl AppImpl {
                 0
             };
         };
-
-        Ok(())
     }
 
-    fn page_down(&mut self) -> Result<()> {
+    fn page_down(&mut self) {
         if matches!(self.selected, Selected::Entry(_)) {
             self.entry_scroll_position = if self.entry_scroll_position
                 + self.entry_lines_rendered_len
@@ -344,8 +348,6 @@ impl AppImpl {
                 self.entry_scroll_position + self.entry_lines_rendered_len
             };
         }
-
-        Ok(())
     }
 
     pub fn on_enter(&mut self) -> Result<()> {
