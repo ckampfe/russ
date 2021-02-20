@@ -1,11 +1,9 @@
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Span, Text},
-    widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap},
-    Frame,
-};
+use tui::backend::Backend;
+use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::style::{Color, Modifier, Style};
+use tui::text::{Span, Text};
+use tui::widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap};
+use tui::Frame;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};

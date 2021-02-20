@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use crate::modes::*;
+use crate::modes::{Mode, Selected};
 use anyhow::{Context, Result};
 use app::App;
 use crossterm::event;
@@ -9,12 +9,12 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use rayon::prelude::*;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::{thread, time};
-use structopt::*;
+use structopt::StructOpt;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 

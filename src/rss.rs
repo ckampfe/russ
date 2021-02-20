@@ -1,7 +1,7 @@
 use crate::modes::ReadMode;
 use anyhow::Result;
 use atom_syndication as atom;
-use chrono::prelude::*;
+use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
 use rusqlite::{params, ToSql, NO_PARAMS};
 use std::collections::HashSet;
