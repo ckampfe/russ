@@ -109,6 +109,9 @@ fn start_async_io(
                 app.set_flash("Refreshing all feeds...".to_string());
                 app.force_redraw()?;
 
+                let all_feeds_len = feed_ids.len();
+                let successfully_refreshed_len = std::sync::atomic::AtomicUsize::new(0);
+
                 feed_ids
                     .into_par_iter()
                     .for_each(|feed_id| match pool.get() {
@@ -128,6 +131,9 @@ fn start_async_io(
                                     })
                             {
                                 app.push_error_flash(e);
+                            } else {
+                                successfully_refreshed_len
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             }
                         }
                         Err(e) => {
@@ -139,7 +145,12 @@ fn start_async_io(
                     app.update_current_feed_and_entries()?;
 
                     let elapsed = now.elapsed();
-                    app.set_flash(format!("Refreshed all feeds in {:?}", elapsed));
+                    app.set_flash(format!(
+                        "Refreshed {}/{} feeds in {:?}",
+                        successfully_refreshed_len.into_inner(),
+                        all_feeds_len,
+                        elapsed
+                    ));
                     app.force_redraw()?;
                 }
 
