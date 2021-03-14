@@ -3,7 +3,8 @@ use anyhow::Result;
 use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
-use rusqlite::{params, ToSql, NO_PARAMS};
+use rusqlite::types::ToSqlOutput;
+use rusqlite::{params, NO_PARAMS};
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -24,6 +25,13 @@ impl rusqlite::types::FromSql for FeedKind {
             Ok(feed_kind) => Ok(feed_kind),
             Err(e) => Err(rusqlite::types::FromSqlError::Other(e.into())),
         }
+    }
+}
+
+impl rusqlite::types::ToSql for FeedKind {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        let s = self.to_string();
+        Ok(ToSqlOutput::from(s))
     }
 }
 
@@ -330,12 +338,7 @@ fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
     conn.execute(
         "INSERT INTO feeds (title, link, feed_link, feed_kind)
         VALUES (?1, ?2, ?3, ?4)",
-        params![
-            feed.title,
-            feed.link,
-            feed.feed_link,
-            feed.feed_kind.to_string()
-        ],
+        params![feed.title, feed.link, feed.feed_link, feed.feed_kind],
     )?;
 
     Ok(conn.last_insert_rowid())
