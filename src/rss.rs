@@ -349,38 +349,34 @@ fn add_entries_to_feed(
     if !entries.is_empty() {
         let now = Utc::now();
 
-        let mut entries_values = vec![];
+        let columns = [
+            "feed_id",
+            "title",
+            "author",
+            "pub_date",
+            "description",
+            "content",
+            "link",
+            "updated_at",
+        ];
+
+        let mut entries_values = Vec::with_capacity(entries.len() * columns.len());
 
         for entry in entries {
-            entries_values.append(&mut vec![
-                feed_id.to_sql()?,
-                entry.title.to_sql()?,
-                entry.author.to_sql()?,
-                entry.pub_date.to_sql()?,
-                entry.description.to_sql()?,
-                entry.content.to_sql()?,
-                entry.link.to_sql()?,
-                now.to_sql()?,
-            ]);
+            let values = params![
+                feed_id,
+                entry.title,
+                entry.author,
+                entry.pub_date,
+                entry.description,
+                entry.content,
+                entry.link,
+                now,
+            ];
+            entries_values.extend_from_slice(&values);
         }
 
-        // this seems cool but probably not the right fit:
-        // https://stackoverflow.com/questions/54177438/how-to-programmatically-get-the-number-of-fields-of-a-struct
-        let query = build_bulk_insert_query(
-            "entries",
-            &[
-                "feed_id",
-                "title",
-                "author",
-                "pub_date",
-                "description",
-                "content",
-                "link",
-                "updated_at",
-            ],
-            &entries_values,
-            entries_values.len() / entries.len(),
-        );
+        let query = build_bulk_insert_query("entries", &columns, &entries);
 
         conn.execute(&query, entries_values)?;
     }
@@ -388,41 +384,46 @@ fn add_entries_to_feed(
     Ok(())
 }
 
-fn build_bulk_insert_query<T>(
-    table: &str,
-    columns: &[&str],
-    entries_values: &[T],
-    entry_fields_len: usize,
-) -> String {
-    let idxs = (1..entries_values.len() + 1).collect::<Vec<_>>();
-    let mut parameter_groups_strings = Vec::with_capacity(entries_values.len());
-    let mut parameters_values = Vec::with_capacity(entry_fields_len);
+fn build_bulk_insert_query<C: AsRef<str>, R>(table: &str, columns: &[C], rows: &[R]) -> String {
+    let idxs = (1..(rows.len() * columns.len() + 1)).collect::<Vec<_>>();
 
-    for chunk in idxs.chunks(entry_fields_len) {
-        parameters_values.clear();
-        let mut parameter_group_string = "(".to_string();
-        for i in chunk {
-            parameters_values.push(format!("?{}", i))
-        }
-        let parameter_values_string = parameters_values.join(", ");
-        parameter_group_string.push_str(&parameter_values_string);
-        parameter_group_string.push(')');
-        parameter_groups_strings.push(parameter_group_string);
-    }
+    let values_groups_string = idxs
+        .chunks(columns.len())
+        .map(|chunk| {
+            let values_string = chunk
+                .iter()
+                .map(|i| format!("?{}", i))
+                .collect::<Vec<_>>()
+                .join(", ");
+            ["(", &values_string, ")"].concat()
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
 
-    let paramter_groups_string = parameter_groups_strings.join(", ");
+    let columns_strs = columns
+        .iter()
+        .map(|column| column.as_ref())
+        .collect::<Vec<&str>>();
 
-    let mut columns_string = "".to_string();
-    columns_string.push('(');
-    columns_string.push_str(&columns.join(", "));
-    columns_string.push_str(") ");
+    let columns_joined = columns_strs.join(", ");
 
-    let mut query = String::new();
+    let mut query = String::with_capacity(
+        "INSERT INTO ".len()
+            + table.len()
+            + 1 // '(' is a char
+            + columns_joined.len()
+            + ") ".len()
+            + "VALUES ".len()
+            + values_groups_string.len(),
+    );
+
     query.push_str("INSERT INTO ");
     query.push_str(table);
-    query.push_str(&columns_string);
+    query.push('(');
+    query.push_str(&columns_joined);
+    query.push_str(") ");
     query.push_str("VALUES ");
-    query.push_str(&paramter_groups_string);
+    query.push_str(&values_groups_string);
 
     query
 }
@@ -684,5 +685,28 @@ mod tests {
         let new_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
         assert_eq!(new_entries.len(), old_entries.len() - 1);
+    }
+
+    #[test]
+    fn build_bulk_insert_query() {
+        let entries = vec!["entry1", "entry2"];
+        let query = super::build_bulk_insert_query(
+            "entries",
+            &[
+                "feed_id",
+                "title",
+                "author",
+                "pub_date",
+                "description",
+                "content",
+                "link",
+                "updated_at",
+            ],
+            &entries,
+        );
+        assert_eq!(
+            query,
+            "INSERT INTO entries(feed_id, title, author, pub_date, description, content, link, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8), (?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)"
+        );
     }
 }
