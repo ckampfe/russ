@@ -15,7 +15,7 @@ pub type FeedId = i64;
 #[derive(Clone, Copy, Debug)]
 pub enum FeedKind {
     Atom,
-    RSS,
+    Rss,
 }
 
 impl rusqlite::types::FromSql for FeedKind {
@@ -39,7 +39,7 @@ impl Display for FeedKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
             FeedKind::Atom => "Atom",
-            FeedKind::RSS => "RSS",
+            FeedKind::Rss => "RSS",
         };
 
         write!(f, "{}", out)
@@ -52,7 +52,7 @@ impl FromStr for FeedKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Atom" => Ok(FeedKind::Atom),
-            "RSS" => Ok(FeedKind::RSS),
+            "RSS" => Ok(FeedKind::Rss),
             _ => Err(anyhow::anyhow!(format!("{} is not a valid FeedKind", s))),
         }
     }
@@ -211,7 +211,7 @@ impl FromStr for FeedAndEntries {
                         title: Some(channel.title().to_string()),
                         feed_link: None,
                         link: Some(channel.link().to_string()),
-                        feed_kind: FeedKind::RSS,
+                        feed_kind: FeedKind::Rss,
                         refreshed_at: None,
                         inserted_at: Utc::now(),
                         updated_at: Utc::now(),
@@ -510,7 +510,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
 pub fn get_feed_ids(conn: &rusqlite::Connection) -> Result<Vec<FeedId>> {
     let mut statement = conn.prepare("SELECT id FROM feeds ORDER BY lower(title) ASC")?;
     let mut ids = vec![];
-    for id in statement.query_map(NO_PARAMS, |row| Ok(row.get(0)?))? {
+    for id in statement.query_map(NO_PARAMS, |row| row.get(0))? {
         ids.push(id?)
     }
 
@@ -636,7 +636,7 @@ pub fn get_entries_links(
     let mut links = vec![];
     let mut statement = conn.prepare(&query)?;
 
-    for link in statement.query_map(params![feed_id], |row| Ok(row.get(0)?))? {
+    for link in statement.query_map(params![feed_id], |row| row.get(0))? {
         links.push(link?);
     }
 

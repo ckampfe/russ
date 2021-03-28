@@ -53,7 +53,7 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
     Ok(time::Duration::from_secs(as_u64))
 }
 
-enum IOCommand {
+enum IoCommand {
     Break,
     RefreshFeed(crate::rss::FeedId),
     RefreshFeeds(Vec<crate::rss::FeedId>),
@@ -63,11 +63,11 @@ enum IOCommand {
 
 fn start_async_io(
     app: App,
-    sx: &mpsc::Sender<IOCommand>,
-    rx: mpsc::Receiver<IOCommand>,
+    sx: &mpsc::Sender<IoCommand>,
+    rx: mpsc::Receiver<IoCommand>,
     options: &Options,
 ) -> Result<()> {
-    use IOCommand::*;
+    use IoCommand::*;
 
     let manager = r2d2_sqlite::SqliteConnectionManager::file(&options.database_path);
     let pool = r2d2::Pool::new(manager)?;
@@ -201,12 +201,12 @@ fn start_async_io(
     Ok(())
 }
 
-fn clear_flash_after(sx: &mpsc::Sender<IOCommand>, duration: &time::Duration) {
+fn clear_flash_after(sx: &mpsc::Sender<IoCommand>, duration: &time::Duration) {
     let sx = sx.clone();
     let duration = *duration;
     thread::spawn(move || {
         thread::sleep(duration);
-        sx.send(IOCommand::ClearFlash)
+        sx.send(IoCommand::ClearFlash)
             .expect("Unable to send IOCommand::ClearFlash");
     });
 }
@@ -289,20 +289,20 @@ fn main() -> Result<()> {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                             terminal.show_cursor()?;
-                            io_s.send(IOCommand::Break)?;
+                            io_s.send(IoCommand::Break)?;
                             break;
                         }
                     }
                     (KeyCode::Char('r'), KeyModifiers::NONE) => match &app.selected() {
                         Selected::Feeds => {
                             let feed_id = app.selected_feed_id();
-                            io_s.send(IOCommand::RefreshFeed(feed_id))?;
+                            io_s.send(IoCommand::RefreshFeed(feed_id))?;
                         }
                         _ => app.toggle_read()?,
                     },
                     (KeyCode::Char('x'), KeyModifiers::NONE) => {
                         let feed_ids = app.feed_ids()?;
-                        io_s.send(IOCommand::RefreshFeeds(feed_ids))?;
+                        io_s.send(IoCommand::RefreshFeeds(feed_ids))?;
                     }
                     // handle all other normal-mode keycodes here
                     (keycode, modifiers) => {
@@ -321,7 +321,7 @@ fn main() -> Result<()> {
                 Event::Input(event) => match event.code {
                     KeyCode::Enter => {
                         let feed_subscription_input = { app.feed_subscription_input() };
-                        io_s.send(IOCommand::SubscribeToFeed(feed_subscription_input))?;
+                        io_s.send(IoCommand::SubscribeToFeed(feed_subscription_input))?;
                     }
                     KeyCode::Char(c) => {
                         app.push_feed_subscription_input(c);
