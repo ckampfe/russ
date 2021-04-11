@@ -3,8 +3,8 @@ use anyhow::Result;
 use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
+use rusqlite::params;
 use rusqlite::types::ToSqlOutput;
-use rusqlite::{params, NO_PARAMS};
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -305,7 +305,7 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
-        NO_PARAMS,
+        [],
     )?;
 
     conn.execute(
@@ -322,26 +322,28 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
-        NO_PARAMS,
+        [],
     )?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index 
         ON entries (feed_id, pub_date, inserted_at)",
-        NO_PARAMS,
+        [],
     )?;
 
     Ok(())
 }
 
 fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
-    conn.execute(
+    let feed_id = conn.query_row::<FeedId, _, _>(
         "INSERT INTO feeds (title, link, feed_link, feed_kind)
-        VALUES (?1, ?2, ?3, ?4)",
+        VALUES (?1, ?2, ?3, ?4)
+        RETURNING id",
         params![feed.title, feed.link, feed.feed_link, feed.feed_kind],
+        |r| r.get(0),
     )?;
 
-    Ok(conn.last_insert_rowid())
+    Ok(feed_id)
 }
 
 fn add_entries_to_feed(
@@ -381,7 +383,7 @@ fn add_entries_to_feed(
 
         let query = build_bulk_insert_query("entries", &columns, &entries);
 
-        conn.execute(&query, entries_values)?;
+        conn.execute(&query, entries_values.as_slice())?;
     }
 
     Ok(())
@@ -489,7 +491,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
         FROM feeds ORDER BY lower(title) ASC",
     )?;
     let mut feeds = vec![];
-    for feed in statement.query_map(NO_PARAMS, |row| {
+    for feed in statement.query_map([], |row| {
         Ok(Feed {
             id: row.get(0)?,
             title: row.get(1)?,
@@ -510,7 +512,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
 pub fn get_feed_ids(conn: &rusqlite::Connection) -> Result<Vec<FeedId>> {
     let mut statement = conn.prepare("SELECT id FROM feeds ORDER BY lower(title) ASC")?;
     let mut ids = vec![];
-    for id in statement.query_map(NO_PARAMS, |row| row.get(0))? {
+    for id in statement.query_map([], |row| row.get(0))? {
         ids.push(id?)
     }
 
@@ -666,7 +668,7 @@ mod tests {
         initialize_db(&conn).unwrap();
         subscribe_to_feed(&http_client, &conn, ZCT).unwrap();
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM entries", NO_PARAMS, |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM entries", [], |row| row.get(0))
             .unwrap();
 
         assert!(count > 50)

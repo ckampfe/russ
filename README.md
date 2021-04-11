@@ -165,6 +165,11 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] page-down/page-up entry scrolling
 - [x] automatic line length for wrapping
 
+## minimum supported version policy
+
+Russ targets the latest stable version of the Rust compiler. Older Rust versions may work, but building Russ against non-latest stable versions is not a project goal.
+Russ compiles and bundles its own embedded Sqlite, which is version 3.35.4.
+
 ## license
 
 See the [license.](LICENSE)

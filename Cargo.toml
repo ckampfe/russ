@@ -15,10 +15,10 @@ crossterm = "0.19"
 diligent-date-parser = "0.1"
 html2text = "0.2"
 r2d2 = "0.8"
-r2d2_sqlite = "0.17"
+r2d2_sqlite = "0.18"
 rayon = "1.5"
 rss = "1.10"
-rusqlite = { version = "0.24", features = ["chrono"] }
+rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
 structopt = "0.3"
 tui = { git = "https://github.com/fdehau/tui-rs", rev = "8832281", default-features = false, features = ["crossterm"] }
 ureq = "2.0"
