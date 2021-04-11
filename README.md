@@ -14,13 +14,9 @@ See the [license](LICENSE) if you're curious about that kind of thing.
 ## install
 
 ```
-$ git clone
-$ cd russ
+$ cargo install russ --git https://github.com/ckampfe/russ
 # note that on linux, you will need these system dependencies as well, for example:
 $ sudo apt update && sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev
-# install the russ binary
-$ cargo install --path .
-# launch russ with default configuration
 $ russ -d"your_db_name.db"
 ```
 
