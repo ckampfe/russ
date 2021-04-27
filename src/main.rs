@@ -83,25 +83,27 @@ fn start_async_io(
 
                 let conn = pool.get()?;
 
-                if let Err(e) = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
-                    .with_context(|| {
+                let r = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id).with_context(
+                    || {
                         let feed_url =
                             crate::rss::get_feed_url(&conn, feed_id).unwrap_or_else(|_| {
                                 panic!("Unable to get feed URL for feed_id {}", feed_id)
                             });
 
                         format!("Failed to fetch and refresh feed {}", feed_url)
-                    })
-                {
-                    app.push_error_flash(e);
-                } else {
-                    app.update_current_feed_and_entries()?;
-                    let elapsed = now.elapsed();
-                    app.set_flash(format!("Refreshed feed in {:?}", elapsed));
-                    app.force_redraw()?;
+                    },
+                );
 
-                    clear_flash_after(&sx, &options.flash_display_duration_seconds);
-                };
+                if let Err(e) = r {
+                    app.push_error_flash(e);
+                    continue;
+                }
+
+                app.update_current_feed_and_entries()?;
+                let elapsed = now.elapsed();
+                app.set_flash(format!("Refreshed feed in {:?}", elapsed));
+                app.force_redraw()?;
+                clear_flash_after(&sx, &options.flash_display_duration_seconds);
             }
             RefreshFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
@@ -116,25 +118,23 @@ fn start_async_io(
                     .into_par_iter()
                     .for_each(|feed_id| match pool.get() {
                         Ok(conn) => {
-                            if let Err(e) =
-                                crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
-                                    .with_context(|| {
-                                        let feed_url = crate::rss::get_feed_url(&conn, feed_id)
-                                            .unwrap_or_else(|_| {
-                                                panic!(
-                                                    "Unable to get feed URL for feed_id {}",
-                                                    feed_id
-                                                )
-                                            });
+                            let r = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
+                                .with_context(|| {
+                                    let feed_url = crate::rss::get_feed_url(&conn, feed_id)
+                                        .unwrap_or_else(|_| {
+                                            panic!("Unable to get feed URL for feed_id {}", feed_id)
+                                        });
 
-                                        format!("Failed to fetch and refresh feed {}", feed_url)
-                                    })
-                            {
+                                    format!("Failed to fetch and refresh feed {}", feed_url)
+                                });
+
+                            if let Err(e) = r {
                                 app.push_error_flash(e);
-                            } else {
-                                successfully_refreshed_len
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                return;
                             }
+
+                            successfully_refreshed_len
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         }
                         Err(e) => {
                             app.push_error_flash(e.into());
@@ -163,33 +163,35 @@ fn start_async_io(
                 app.force_redraw()?;
 
                 let conn = pool.get()?;
-
-                if let Err(e) = crate::rss::subscribe_to_feed(
+                let r = crate::rss::subscribe_to_feed(
                     &app.http_client(),
                     &conn,
                     &feed_subscription_input,
-                ) {
+                );
+
+                if let Err(e) = r {
                     app.push_error_flash(e);
-                } else {
-                    match crate::rss::get_feeds(&conn) {
-                        Ok(feeds) => {
-                            {
-                                app.reset_feed_subscription_input();
-                                app.set_feeds(feeds);
-                                app.select_feeds();
-                                app.update_current_feed_and_entries()?;
+                    continue;
+                }
 
-                                let elapsed = now.elapsed();
-                                app.set_flash(format!("Subscribed in {:?}", elapsed));
-                                app.force_redraw()?;
-                            }
+                match crate::rss::get_feeds(&conn) {
+                    Ok(feeds) => {
+                        {
+                            app.reset_feed_subscription_input();
+                            app.set_feeds(feeds);
+                            app.select_feeds();
+                            app.update_current_feed_and_entries()?;
 
-                            clear_flash_after(&sx, &options.flash_display_duration_seconds);
+                            let elapsed = now.elapsed();
+                            app.set_flash(format!("Subscribed in {:?}", elapsed));
+                            app.force_redraw()?;
                         }
-                        Err(e) => {
-                            app.push_error_flash(e);
-                        }
-                    };
+
+                        clear_flash_after(&sx, &options.flash_display_duration_seconds);
+                    }
+                    Err(e) => {
+                        app.push_error_flash(e);
+                    }
                 }
             }
             ClearFlash => {
