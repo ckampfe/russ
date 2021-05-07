@@ -293,27 +293,23 @@ impl AppImpl {
     }
 
     fn get_selected_entry(&self) -> Option<Result<crate::rss::EntryContent>> {
-        if let Some(selected_idx) = self.entries.state.selected() {
-            if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
-                Some(crate::rss::get_entry_content(&self.conn, entry_id))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+        self.entries.state.selected().and_then(|selected_idx| {
+            self.entries
+                .items
+                .get(selected_idx)
+                .map(|item| item.id)
+                .map(|entry_id| crate::rss::get_entry_content(&self.conn, entry_id))
+        })
     }
 
     fn get_selected_entry_meta(&self) -> Option<Result<crate::rss::EntryMeta>> {
-        if let Some(selected_idx) = self.entries.state.selected() {
-            if let Some(entry_id) = self.entries.items.get(selected_idx).map(|item| item.id) {
-                Some(crate::rss::get_entry_meta(&self.conn, entry_id))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+        self.entries.state.selected().and_then(|selected_idx| {
+            self.entries
+                .items
+                .get(selected_idx)
+                .map(|item| item.id)
+                .map(|entry_id| crate::rss::get_entry_meta(&self.conn, entry_id))
+        })
     }
 
     fn update_current_entry_meta(&mut self) -> Result<()> {

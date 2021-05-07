@@ -49,7 +49,7 @@ pub struct Options {
 }
 
 fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
-    let as_u64 = u64::from_str_radix(s, 10)?;
+    let as_u64 = s.parse::<u64>()?;
     Ok(time::Duration::from_secs(as_u64))
 }
 
