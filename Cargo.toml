@@ -20,7 +20,7 @@ rayon = "1.5"
 rss = "1.10"
 rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
 structopt = "0.3"
-tui = { git = "https://github.com/fdehau/tui-rs", rev = "8832281", default-features = false, features = ["crossterm"] }
+tui = { version = "0.15", default-features = false, features = ["crossterm"] }
 ureq = "2.1"
 
 [profile.release]
