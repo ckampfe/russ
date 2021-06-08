@@ -186,7 +186,7 @@ impl FromStr for FeedAndEntries {
             Ok(atom_feed) => {
                 let feed = Feed {
                     id: 0,
-                    title: Some(atom_feed.title.clone()),
+                    title: Some(atom_feed.title.to_string()),
                     feed_link: None,
                     link: atom_feed.links.get(0).map(|link| link.href().to_string()),
                     feed_kind: FeedKind::Atom,

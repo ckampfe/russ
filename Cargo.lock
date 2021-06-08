@@ -35,7 +35,18 @@ dependencies = [
  "chrono",
  "derive_builder",
  "diligent-date-parser",
- "quick-xml",
+ "quick-xml 0.20.0",
+]
+
+[[package]]
+name = "atom_syndication"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ef55438c44fce2215bcd0539964a98ab4bcd77007487a0e72a88ffef2286de"
+dependencies = [
+ "chrono",
+ "diligent-date-parser",
+ "quick-xml 0.22.0",
 ]
 
 [[package]]
@@ -418,9 +429,9 @@ dependencies = [
 
 [[package]]
 name = "heck"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
+checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -898,6 +909,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
+dependencies = [
+ "encoding_rs",
+ "memchr",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1033,9 +1054,9 @@ version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e70d6ae72f8a4333af8ce9dce58942020528430eb0d46ee2fcb5e8d4d16377"
 dependencies = [
- "atom_syndication",
+ "atom_syndication 0.9.1",
  "derive_builder",
- "quick-xml",
+ "quick-xml 0.20.0",
 ]
 
 [[package]]
@@ -1059,7 +1080,7 @@ name = "russ"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "atom_syndication",
+ "atom_syndication 0.10.0",
  "chrono",
  "copypasta",
  "crossterm",
@@ -1331,9 +1352,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-normalization"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33717dca7ac877f497014e10d73f3acf948c342bee31b5ca7892faf94ccc6b49"
+checksum = "d54590932941a9e9266f0832deed84ebe1bf2e4c9e4a3554d393d18f5e854bf9"
 dependencies = [
  "tinyvec",
 ]

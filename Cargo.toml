@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-atom_syndication = { version = "0.9", default-features = false }
+atom_syndication = { version = "0.10", default-features = false }
 chrono = "0.4"
 copypasta = "0.7"
 crossterm = "0.19"
