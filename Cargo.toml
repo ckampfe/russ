@@ -13,13 +13,15 @@ chrono = "0.4"
 copypasta = "0.7"
 crossterm = "0.19"
 diligent-date-parser = "0.1"
+futures-util = "0.3"
 html2text = "0.2"
+num_cpus = "1.13"
 r2d2 = "0.8"
 r2d2_sqlite = "0.18"
-rayon = "1.5"
 rss = "1.10"
 rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
 structopt = "0.3"
+tokio = { version = "1", features = ["rt"] }
 tui = { version = "0.15", default-features = false, features = ["crossterm"] }
 ureq = "2.1"
 

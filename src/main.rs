@@ -9,7 +9,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use futures_util::StreamExt;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -61,7 +61,7 @@ enum IoCommand {
     ClearFlash,
 }
 
-fn start_async_io(
+async fn start_async_io(
     app: App,
     sx: &mpsc::Sender<IoCommand>,
     rx: mpsc::Receiver<IoCommand>,
@@ -112,34 +112,48 @@ fn start_async_io(
                 app.force_redraw()?;
 
                 let all_feeds_len = feed_ids.len();
-                let successfully_refreshed_len = std::sync::atomic::AtomicUsize::new(0);
+                let mut successfully_refreshed_len = 0usize;
 
-                feed_ids
-                    .into_par_iter()
-                    .for_each(|feed_id| match pool.get() {
+                let feed_ids_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
+                    let p = pool.get();
+                    let http = app.http_client();
+                    // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
+                    // and using `tokio::task::spawn` with a blocking call has the potential to block
+                    // the scheduler
+                    tokio::task::spawn_blocking(move || match p {
                         Ok(conn) => {
-                            let r = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id)
-                                .with_context(|| {
+                            let r = crate::rss::refresh_feed(&http, &conn, feed_id).with_context(
+                                || {
                                     let feed_url = crate::rss::get_feed_url(&conn, feed_id)
                                         .unwrap_or_else(|_| {
                                             panic!("Unable to get feed URL for feed_id {}", feed_id)
                                         });
 
                                     format!("Failed to fetch and refresh feed {}", feed_url)
-                                });
+                                },
+                            );
 
                             if let Err(e) = r {
-                                app.push_error_flash(e);
-                                return;
+                                let ret = Err(anyhow::anyhow!(e));
+                                return ret;
                             }
 
-                            successfully_refreshed_len
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            Ok(())
                         }
-                        Err(e) => {
-                            app.push_error_flash(e.into());
-                        }
-                    });
+                        Err(e) => Err(e.into()),
+                    })
+                });
+
+                let mut buffered = feed_ids_stream.buffer_unordered(num_cpus::get());
+
+                while let Some(join_result) = buffered.next().await {
+                    let fetch_result = join_result?;
+
+                    match fetch_result {
+                        Ok(_) => successfully_refreshed_len += 1,
+                        Err(e) => app.push_error_flash(e),
+                    }
+                }
 
                 {
                     app.update_current_feed_and_entries()?;
@@ -147,9 +161,7 @@ fn start_async_io(
                     let elapsed = now.elapsed();
                     app.set_flash(format!(
                         "Refreshed {}/{} feeds in {:?}",
-                        successfully_refreshed_len.into_inner(),
-                        all_feeds_len,
-                        elapsed
+                        successfully_refreshed_len, all_feeds_len, elapsed
                     ));
                     app.force_redraw()?;
                 }
@@ -262,10 +274,16 @@ fn main() -> Result<()> {
 
     let io_s_clone = io_s.clone();
 
-    // this thread is for async IO
+    // we run tokio in this thread to manage the blocking http calls used to fetch feeds
     let io_thread = thread::spawn(move || -> Result<()> {
-        start_async_io(cloned_app, &io_s_clone, io_r, &options_clone)?;
-        Ok(())
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+
+        rt.block_on(async move {
+            start_async_io(cloned_app, &io_s_clone, io_r, &options_clone).await?;
+            Ok(())
+        })
     });
 
     // MAIN THREAD IS DRAW THREAD
