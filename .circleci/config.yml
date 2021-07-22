@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run:
           name: Install system deps
-          command: sudo apt-get update && sudo apt-get install  libxcb-shape0-dev libxcb-xfixes0-dev
+          command: sudo apt-get update && sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
