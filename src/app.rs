@@ -41,7 +41,6 @@ impl App {
         (force_redraw, Result<()>),
         (http_client, ureq::Agent),
         (mode, Mode),
-        (put_current_link_in_clipboard, Result<()>),
         (selected, Selected),
         (selected_feed_id, crate::rss::FeedId),
     ];
@@ -57,6 +56,7 @@ impl App {
         (page_up, ()),
         (page_down, ()),
         (pop_feed_subscription_input, ()),
+        (put_current_link_in_clipboard, Result<()>),
         (reset_feed_subscription_input, ()),
         (select_feeds, ()),
         (toggle_help, Result<()>),
@@ -187,6 +187,7 @@ pub struct AppImpl {
     pub feed_subscription_input: String,
     pub flash: Option<String>,
     event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+    is_wsl: Option<bool>,
 }
 
 impl AppImpl {
@@ -228,6 +229,7 @@ impl AppImpl {
             entry_selection_position: 0,
             flash: None,
             event_s,
+            is_wsl: None,
         };
 
         app.update_feeds()?;
@@ -495,28 +497,36 @@ impl AppImpl {
         Ok(())
     }
 
-    fn put_current_link_in_clipboard(&self) -> Result<()> {
-        let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
-
-        let clipboard_result = match &self.selected {
+    fn put_current_link_in_clipboard(&mut self) -> Result<()> {
+        let current_link = match &self.selected {
             Selected::Feeds => {
                 let feed = self.current_feed.clone().unwrap();
-                let link = feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap());
-                ctx.set_contents(link)
+                feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap())
             }
             Selected::Entries => {
                 let idx = self.entry_selection_position;
                 let entry = &self.entries.items[idx];
-                let link = entry.link.clone().unwrap_or_else(|| "".to_string());
-                ctx.set_contents(link)
+                entry.link.clone().unwrap_or_else(|| "".to_string())
             }
-            Selected::Entry(e) => {
-                let link = e.link.clone().unwrap_or_else(|| "".to_string());
-                ctx.set_contents(link)
-            }
+            Selected::Entry(e) => e.link.clone().unwrap_or_else(|| "".to_string()),
         };
 
-        clipboard_result.map_err(|e| anyhow::anyhow!(e))
+        if self.is_wsl() {
+            util::set_wsl_clipboard_contents(&current_link)
+        } else {
+            let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
+            ctx.set_contents(current_link)
+                .map_err(|e| anyhow::anyhow!(e))
+        }
+    }
+
+    fn is_wsl(&mut self) -> bool {
+        if let Some(is_wsl) = self.is_wsl {
+            is_wsl
+        } else {
+            self.is_wsl = Some(wsl::is_wsl());
+            self.is_wsl.unwrap()
+        }
     }
 
     pub fn on_left(&mut self) -> Result<()> {

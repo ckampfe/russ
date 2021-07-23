@@ -24,6 +24,7 @@ structopt = "0.3"
 tokio = { version = "1", features = ["rt"] }
 tui = { version = "0.15", default-features = false, features = ["crossterm"] }
 ureq = "2.1"
+wsl = "0.1"
 
 [profile.release]
 codegen-units = 1

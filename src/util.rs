@@ -56,3 +56,24 @@ impl<T> From<Vec<T>> for StatefulList<T> {
         StatefulList::with_items(other)
     }
 }
+
+#[cfg(target_os = "linux")]
+pub(crate) fn set_wsl_clipboard_contents(s: &str) -> anyhow::Result<()> {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+
+    // it looks like this on the CLI:
+    // `echo "foo" | clip.exe`
+    let mut clipboard = Command::new("clip.exe").stdin(Stdio::piped()).spawn()?;
+
+    let mut clipboard_stdin = clipboard
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Unable to get stdin handle for clip.exe"))?;
+
+    clipboard_stdin.write_all(s.as_bytes())?;
+
+    Ok(())
+}
