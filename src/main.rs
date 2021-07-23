@@ -115,32 +115,15 @@ async fn start_async_io(
                 let mut successfully_refreshed_len = 0usize;
 
                 let requests_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
-                    let p = pool.get();
+                    let pool_get_result = pool.get();
                     let http = app.http_client();
                     // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
                     // and using `tokio::task::spawn` with a blocking call has the potential to block
                     // the scheduler
-                    tokio::task::spawn_blocking(move || match p {
-                        Ok(conn) => {
-                            let r = crate::rss::refresh_feed(&http, &conn, feed_id).with_context(
-                                || {
-                                    let feed_url = crate::rss::get_feed_url(&conn, feed_id)
-                                        .unwrap_or_else(|_| {
-                                            panic!("Unable to get feed URL for feed_id {}", feed_id)
-                                        });
-
-                                    format!("Failed to fetch and refresh feed {}", feed_url)
-                                },
-                            );
-
-                            if let Err(e) = r {
-                                let ret = Err(anyhow::anyhow!(e));
-                                return ret;
-                            }
-
-                            Ok(())
-                        }
-                        Err(e) => Err(e.into()),
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool_get_result?;
+                        crate::rss::refresh_feed(&http, &conn, feed_id)?;
+                        Ok(())
                     })
                 });
 

@@ -1,5 +1,5 @@
 use crate::modes::ReadMode;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
@@ -259,8 +259,14 @@ pub fn refresh_feed(
     conn: &rusqlite::Connection,
     feed_id: FeedId,
 ) -> Result<()> {
-    let feed_url = get_feed_url(conn, feed_id)?;
-    let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)?;
+    let feed_url = get_feed_url(conn, feed_id).with_context(|| {
+        format!(
+            "Unable to get url for feed id {} from the database",
+            feed_id
+        )
+    })?;
+    let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)
+        .with_context(|| format!("Failed to fetch feed {}", feed_url))?;
     let remote_items = remote_feed.entries;
     let remote_items_links = remote_items
         .iter()
