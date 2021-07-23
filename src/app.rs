@@ -512,7 +512,15 @@ impl AppImpl {
         };
 
         if self.is_wsl() {
-            util::set_wsl_clipboard_contents(&current_link)
+            #[cfg(target_os = "linux")]
+            {
+                util::set_wsl_clipboard_contents(&current_link)
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                unreachable!("This should never happen. This code should only be reachable if the target OS is WSL.")
+            }
         } else {
             let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
             ctx.set_contents(current_link)
