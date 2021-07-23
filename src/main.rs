@@ -103,7 +103,7 @@ async fn start_async_io(
                 let elapsed = now.elapsed();
                 app.set_flash(format!("Refreshed feed in {:?}", elapsed));
                 app.force_redraw()?;
-                clear_flash_after(&sx, &options.flash_display_duration_seconds);
+                clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
             }
             RefreshFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
@@ -114,7 +114,7 @@ async fn start_async_io(
                 let all_feeds_len = feed_ids.len();
                 let mut successfully_refreshed_len = 0usize;
 
-                let feed_ids_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
+                let requests_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
                     let p = pool.get();
                     let http = app.http_client();
                     // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
@@ -144,10 +144,10 @@ async fn start_async_io(
                     })
                 });
 
-                let mut buffered = feed_ids_stream.buffer_unordered(num_cpus::get());
+                let mut buffered_requests = requests_stream.buffer_unordered(num_cpus::get() * 2);
 
-                while let Some(join_result) = buffered.next().await {
-                    let fetch_result = join_result?;
+                while let Some(task_join_result) = buffered_requests.next().await {
+                    let fetch_result = task_join_result?;
 
                     match fetch_result {
                         Ok(_) => successfully_refreshed_len += 1,
@@ -166,7 +166,7 @@ async fn start_async_io(
                     app.force_redraw()?;
                 }
 
-                clear_flash_after(&sx, &options.flash_display_duration_seconds);
+                clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
             }
             SubscribeToFeed(feed_subscription_input) => {
                 let now = std::time::Instant::now();
@@ -199,7 +199,7 @@ async fn start_async_io(
                             app.force_redraw()?;
                         }
 
-                        clear_flash_after(&sx, &options.flash_display_duration_seconds);
+                        clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
                     }
                     Err(e) => {
                         app.push_error_flash(e);
@@ -215,14 +215,10 @@ async fn start_async_io(
     Ok(())
 }
 
-fn clear_flash_after(sx: &mpsc::Sender<IoCommand>, duration: &time::Duration) {
-    let sx = sx.clone();
-    let duration = *duration;
-    thread::spawn(move || {
-        thread::sleep(duration);
-        sx.send(IoCommand::ClearFlash)
-            .expect("Unable to send IOCommand::ClearFlash");
-    });
+async fn clear_flash_after(sx: &mpsc::Sender<IoCommand>, duration: &time::Duration) {
+    tokio::time::sleep(*duration).await;
+    sx.send(IoCommand::ClearFlash)
+        .expect("Unable to send IOCommand::ClearFlash");
 }
 
 fn main() -> Result<()> {

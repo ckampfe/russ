@@ -21,7 +21,7 @@ r2d2_sqlite = "0.18"
 rss = "1.10"
 rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
 structopt = "0.3"
-tokio = { version = "1", features = ["rt"] }
+tokio = { version = "1", features = ["rt", "time"] }
 tui = { version = "0.15", default-features = false, features = ["crossterm"] }
 ureq = "2.1"
 wsl = "0.1"
