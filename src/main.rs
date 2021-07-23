@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use crate::modes::{Mode, Selected};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use app::App;
 use crossterm::event;
 use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
@@ -61,7 +61,7 @@ enum IoCommand {
     ClearFlash,
 }
 
-async fn start_async_io(
+async fn async_io_loop(
     app: App,
     sx: &mpsc::Sender<IoCommand>,
     rx: mpsc::Receiver<IoCommand>,
@@ -70,7 +70,7 @@ async fn start_async_io(
     use IoCommand::*;
 
     let manager = r2d2_sqlite::SqliteConnectionManager::file(&options.database_path);
-    let pool = r2d2::Pool::new(manager)?;
+    let connection_pool = r2d2::Pool::new(manager)?;
 
     while let Ok(event) = rx.recv() {
         match event {
@@ -81,23 +81,12 @@ async fn start_async_io(
                 app.set_flash("Refreshing feed...".to_string());
                 app.force_redraw()?;
 
-                let conn = pool.get()?;
-
-                let r = crate::rss::refresh_feed(&app.http_client(), &conn, feed_id).with_context(
-                    || {
-                        let feed_url =
-                            crate::rss::get_feed_url(&conn, feed_id).unwrap_or_else(|_| {
-                                panic!("Unable to get feed URL for feed_id {}", feed_id)
-                            });
-
-                        format!("Failed to fetch and refresh feed {}", feed_url)
-                    },
-                );
-
-                if let Err(e) = r {
-                    app.push_error_flash(e);
-                    continue;
-                }
+                refresh_feeds(&app, &connection_pool, &[feed_id], |_app, fetch_result| {
+                    if let Err(e) = fetch_result {
+                        app.push_error_flash(e)
+                    }
+                })
+                .await?;
 
                 app.update_current_feed_and_entries()?;
                 let elapsed = now.elapsed();
@@ -114,29 +103,13 @@ async fn start_async_io(
                 let all_feeds_len = feed_ids.len();
                 let mut successfully_refreshed_len = 0usize;
 
-                let requests_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
-                    let pool_get_result = pool.get();
-                    let http = app.http_client();
-                    // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
-                    // and using `tokio::task::spawn` with a blocking call has the potential to block
-                    // the scheduler
-                    tokio::task::spawn_blocking(move || {
-                        let conn = pool_get_result?;
-                        crate::rss::refresh_feed(&http, &conn, feed_id)?;
-                        Ok(())
-                    })
-                });
-
-                let mut buffered_requests = requests_stream.buffer_unordered(num_cpus::get() * 2);
-
-                while let Some(task_join_result) = buffered_requests.next().await {
-                    let fetch_result = task_join_result?;
-
+                refresh_feeds(&app, &connection_pool, &feed_ids, |app, fetch_result| {
                     match fetch_result {
                         Ok(_) => successfully_refreshed_len += 1,
                         Err(e) => app.push_error_flash(e),
                     }
-                }
+                })
+                .await?;
 
                 {
                     app.update_current_feed_and_entries()?;
@@ -157,7 +130,7 @@ async fn start_async_io(
                 app.set_flash("Subscribing to feed...".to_string());
                 app.force_redraw()?;
 
-                let conn = pool.get()?;
+                let conn = connection_pool.get()?;
                 let r = crate::rss::subscribe_to_feed(
                     &app.http_client(),
                     &conn,
@@ -193,6 +166,39 @@ async fn start_async_io(
                 app.clear_flash();
             }
         }
+    }
+
+    Ok(())
+}
+
+async fn refresh_feeds<'a, F>(
+    app: &App,
+    connection_pool: &r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
+    feed_ids: &[crate::rss::FeedId],
+    mut f: F,
+) -> Result<()>
+where
+    F: FnMut(&App, anyhow::Result<()>),
+{
+    let feed_ids = feed_ids.to_owned();
+    let requests_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
+        let pool_get_result = connection_pool.get();
+        let http = app.http_client();
+        // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
+        // and using `tokio::task::spawn` with a blocking call has the potential to block
+        // the scheduler
+        tokio::task::spawn_blocking(move || {
+            let conn = pool_get_result?;
+            crate::rss::refresh_feed(&http, &conn, feed_id)?;
+            Ok(())
+        })
+    });
+
+    let mut buffered_requests = requests_stream.buffer_unordered(num_cpus::get() * 2);
+
+    while let Some(task_join_result) = buffered_requests.next().await {
+        let fetch_result = task_join_result?;
+        f(app, fetch_result)
     }
 
     Ok(())
@@ -260,7 +266,7 @@ fn main() -> Result<()> {
             .build()?;
 
         rt.block_on(async move {
-            start_async_io(cloned_app, &io_s_clone, io_r, &options_clone).await?;
+            async_io_loop(cloned_app, &io_s_clone, io_r, &options_clone).await?;
             Ok(())
         })
     });
