@@ -139,7 +139,7 @@ pub struct EntryMeta {
 impl EntryMeta {
     pub fn toggle_read(&self, conn: &rusqlite::Connection) -> Result<()> {
         if self.read_at.is_none() {
-            self.mark_as_read(&conn)
+            self.mark_as_read(conn)
         } else {
             self.mark_as_unread(conn)
         }
@@ -294,7 +294,7 @@ pub fn refresh_feed(
 
     add_entries_to_feed(conn, feed_id, &items_to_add)?;
 
-    update_feed_refreshed_at(&conn, feed_id)?;
+    update_feed_refreshed_at(conn, feed_id)?;
 
     Ok(())
 }
@@ -384,10 +384,10 @@ fn add_entries_to_feed(
                 entry.link,
                 now,
             ];
-            entries_values.extend_from_slice(&values);
+            entries_values.extend_from_slice(values);
         }
 
-        let query = build_bulk_insert_query("entries", &columns, &entries);
+        let query = build_bulk_insert_query("entries", &columns, entries);
 
         conn.execute(&query, entries_values.as_slice())?;
     }

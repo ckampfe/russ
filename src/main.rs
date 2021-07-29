@@ -92,7 +92,7 @@ async fn async_io_loop(
                 let elapsed = now.elapsed();
                 app.set_flash(format!("Refreshed feed in {:?}", elapsed));
                 app.force_redraw()?;
-                clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
+                clear_flash_after(sx, &options.flash_display_duration_seconds).await;
             }
             RefreshFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
@@ -122,7 +122,7 @@ async fn async_io_loop(
                     app.force_redraw()?;
                 }
 
-                clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
+                clear_flash_after(sx, &options.flash_display_duration_seconds).await;
             }
             SubscribeToFeed(feed_subscription_input) => {
                 let now = std::time::Instant::now();
@@ -155,7 +155,7 @@ async fn async_io_loop(
                             app.force_redraw()?;
                         }
 
-                        clear_flash_after(&sx, &options.flash_display_duration_seconds).await;
+                        clear_flash_after(sx, &options.flash_display_duration_seconds).await;
                     }
                     Err(e) => {
                         app.push_error_flash(e);
