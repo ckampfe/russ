@@ -11,7 +11,7 @@ anyhow = "1.0"
 atom_syndication = { version = "0.10", default-features = false }
 chrono = "0.4"
 copypasta = "0.7"
-crossterm = "0.19"
+crossterm = "0.20"
 diligent-date-parser = "0.1"
 futures-util = "0.3"
 html2text = "0.2"
@@ -22,7 +22,7 @@ rss = "1.10"
 rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
 structopt = "0.3"
 tokio = { version = "1", features = ["rt", "time"] }
-tui = { version = "0.15", default-features = false, features = ["crossterm"] }
+tui = { version = "0.16", default-features = false, features = ["crossterm"] }
 ureq = "2.1"
 wsl = "0.1"
 
