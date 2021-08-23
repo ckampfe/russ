@@ -281,6 +281,7 @@ impl AppImpl {
         };
 
         self.entries = entries;
+
         if self.entry_selection_position < self.entries.items.len() {
             self.entries
                 .state
@@ -292,6 +293,14 @@ impl AppImpl {
             }
         }
         Ok(())
+    }
+
+    fn update_entry_selection_position(&mut self) {
+        if self.entries.items.is_empty() {
+            self.entry_selection_position = 0
+        } else if self.entry_selection_position > self.entries.items.len() - 1 {
+            self.entry_selection_position = self.entries.items.len() - 1
+        };
     }
 
     fn get_selected_entry(&self) -> Option<Result<crate::rss::EntryContent>> {
@@ -459,6 +468,7 @@ impl AppImpl {
                     entry_meta.toggle_read(&self.conn)?;
                     self.update_current_entries()?;
                     self.update_current_entry_meta()?;
+                    self.update_entry_selection_position();
                 }
             }
             Selected::Feeds => (),
@@ -504,9 +514,11 @@ impl AppImpl {
                 feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap())
             }
             Selected::Entries => {
-                let idx = self.entry_selection_position;
-                let entry = &self.entries.items[idx];
-                entry.link.clone().unwrap_or_else(|| "".to_string())
+                if let Some(entry) = self.entries.items.get(self.entry_selection_position) {
+                    entry.link.clone().unwrap_or_else(|| "".to_string())
+                } else {
+                    "".to_string()
+                }
             }
             Selected::Entry(e) => e.link.clone().unwrap_or_else(|| "".to_string()),
         };
