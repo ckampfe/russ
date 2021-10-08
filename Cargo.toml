@@ -17,9 +17,9 @@ futures-util = "0.3"
 html2text = "0.2"
 num_cpus = "1.13"
 r2d2 = "0.8"
-r2d2_sqlite = "0.18"
+r2d2_sqlite = "0.19"
 rss =  { git = "https://github.com/rust-syndication/rss", rev = "0daf20b", default-features = false }
-rusqlite = { version = "0.25", features = ["bundled", "chrono"] }
+rusqlite = { version = "0.26", features = ["bundled", "chrono"] }
 structopt = "0.3"
 tokio = { version = "1", features = ["rt", "time"] }
 tui = { version = "0.16", default-features = false, features = ["crossterm"] }
