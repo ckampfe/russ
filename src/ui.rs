@@ -107,15 +107,14 @@ where
     if let Some(pub_date) = &entry_meta.pub_date {
         text.push_str("Pub. date: ");
         text.push_str(pub_date.to_string().as_str());
-        text.push('\n');
     } else {
         // TODO this should probably pull the <updated> tag
         // and use that
         let inserted_at = entry_meta.inserted_at;
         text.push_str("Pulled date: ");
         text.push_str(inserted_at.to_string().as_str());
-        text.push('\n');
     }
+    text.push('\n');
 
     if let Some(read_at) = &entry_meta.read_at {
         text.push_str("Read at: ");
