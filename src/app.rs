@@ -43,6 +43,7 @@ impl App {
         (mode, Mode),
         (selected, Selected),
         (selected_feed_id, crate::rss::FeedId),
+        (open_link_in_browser, Result<()>),
     ];
 
     delegate_to_locked_mut_inner![
@@ -127,6 +128,7 @@ impl App {
                 Ok(())
             }
             (KeyCode::Char('c'), _) => self.put_current_link_in_clipboard(),
+            (KeyCode::Char('o'), _) => self.open_link_in_browser(),
             _ => Ok(()),
         }
     }
@@ -507,8 +509,8 @@ impl AppImpl {
         Ok(())
     }
 
-    fn put_current_link_in_clipboard(&mut self) -> Result<()> {
-        let current_link = match &self.selected {
+    fn get_current_link(&self) -> String {
+        match &self.selected {
             Selected::Feeds => {
                 let feed = self.current_feed.clone().unwrap();
                 feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap())
@@ -521,7 +523,11 @@ impl AppImpl {
                 }
             }
             Selected::Entry(e) => e.link.clone().unwrap_or_else(|| "".to_string()),
-        };
+        }
+    }
+
+    fn put_current_link_in_clipboard(&mut self) -> Result<()> {
+        let current_link = self.get_current_link();
 
         if self.is_wsl() {
             #[cfg(target_os = "linux")]
@@ -538,6 +544,14 @@ impl AppImpl {
             ctx.set_contents(current_link)
                 .map_err(|e| anyhow::anyhow!(e))
         }
+    }
+
+    fn open_link_in_browser(&self) -> Result<()> {
+        webbrowser::open_browser_with_options(webbrowser::BrowserOptions::create_with_suppressed_output(
+            &self.get_current_link(),
+        ))
+        .map(|_| ())
+        .map_err(|e| anyhow::anyhow!(e))
     }
 
     fn is_wsl(&mut self) -> bool {

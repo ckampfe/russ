@@ -56,6 +56,7 @@ To view entries you have marked read, press `a`. You can mark them unread by pre
 To view entries that are unread (the default state), press `a` again.
 
 Pressing `c` copies the URL of the current feed or entry to your clipboard, depending on which is in focus.
+Pressing `o` opens the URL in your default browser.
 
 To refresh a single feed, press `r` when you are in the most general context (all the way to the left) and that feed is highlighted.
 To refresh all feeds, press `x` when in the most general context.
@@ -74,6 +75,7 @@ Press `q` or `Esc` to quit Russ.
 `a` - view read/unread entries
 `x` - refresh all feeds
 `c` - copy current entry link or feed link to clipboard (depending on selection)
+`o` - open current entry link or feed link in browser  (depending on selection)
 `Esc` - go from insert mode to normal mode
 
 ## help/options/config

@@ -953,6 +953,7 @@ dependencies = [
  "tokio",
  "tui",
  "ureq",
+ "webbrowser",
  "wsl",
 ]
 
@@ -1462,6 +1463,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "webbrowser"
+version = "0.5.2"
+source = "git+https://github.com/codota/webbrowser-rs?branch=feature/add-suppress-output-flag-with-docs#56ac3f9f29347039ff075be1f14af0ed10f12b47"
+dependencies = [
+ "widestring",
+ "winapi",
+]
+
+[[package]]
 name = "webpki"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1479,6 +1489,12 @@ checksum = "c475786c6f47219345717a043a37ec04cb4bc185e28853adcc4fa0a947eba630"
 dependencies = [
  "webpki",
 ]
+
+[[package]]
+name = "widestring"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c168940144dd21fd8046987c16a46a33d5fc84eec29ef9dcddc2ac9e31526b7c"
 
 [[package]]
 name = "winapi"
