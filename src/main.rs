@@ -332,6 +332,9 @@ fn main() -> Result<()> {
                         app.push_feed_subscription_input(c);
                     }
                     KeyCode::Backspace => app.pop_feed_subscription_input(),
+                    KeyCode::Delete => {
+                        app.delete_feed()?;
+                    },
                     KeyCode::Esc => {
                         app.set_mode(Mode::Normal);
                     }

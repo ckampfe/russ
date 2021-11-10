@@ -352,6 +352,14 @@ fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
     Ok(feed_id)
 }
 
+pub fn delete_feed(conn: &mut rusqlite::Connection, feed_id: FeedId) -> Result<()> {
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM feeds WHERE id = ?1", params![feed_id])?;
+    tx.execute("DELETE FROM entries WHERE feed_id = ?1", params![feed_id])?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn add_entries_to_feed(
     conn: &rusqlite::Connection,
     feed_id: FeedId,
