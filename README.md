@@ -162,6 +162,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] show/hide help with `?`
 - [x] page-down/page-up entry scrolling
 - [x] automatic line length for wrapping
+- [x] ability to open the current link in your default browser
 
 ## minimum supported version policy
 
