@@ -78,7 +78,7 @@ impl App {
     pub fn draw(&self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
 
-        terminal.draw(|mut f| {
+        terminal.draw(|f| {
             let chunks = crate::ui::predraw(f);
 
             assert!(
@@ -97,7 +97,7 @@ impl App {
 
             inner.entry_column_width = chunks[1].width;
 
-            crate::ui::draw(&mut f, chunks, &mut inner);
+            crate::ui::draw(f, chunks, &mut inner);
         })?;
 
         Ok(())
@@ -547,9 +547,9 @@ impl AppImpl {
     }
 
     fn open_link_in_browser(&self) -> Result<()> {
-        webbrowser::open_browser_with_options(webbrowser::BrowserOptions::create_with_suppressed_output(
-            &self.get_current_link(),
-        ))
+        webbrowser::open_browser_with_options(
+            webbrowser::BrowserOptions::create_with_suppressed_output(&self.get_current_link()),
+        )
         .map(|_| ())
         .map_err(|e| anyhow::anyhow!(e))
     }
