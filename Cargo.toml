@@ -10,7 +10,7 @@ edition = "2021"
 anyhow = "1.0"
 atom_syndication = { version = "0.11", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-copypasta = "0.7"
+copypasta = { git = "https://github.com/alacritty/copypasta", rev = "5a4c6dc"}
 crossterm = "0.20"
 diligent-date-parser = "0.1"
 futures-util = "0.3"

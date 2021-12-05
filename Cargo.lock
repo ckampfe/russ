@@ -144,8 +144,7 @@ dependencies = [
 [[package]]
 name = "copypasta"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4423d79fed83ebd9ab81ec21fa97144300a961782158287dc9bf7eddac37ff0b"
+source = "git+https://github.com/alacritty/copypasta?rev=5a4c6dc#5a4c6dc14a85a55336cc18b7169519064e228fe8"
 dependencies = [
  "clipboard-win",
  "objc",
