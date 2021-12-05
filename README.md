@@ -26,7 +26,7 @@ I do not currently publish binary releases, but that may change if someone is in
 
 Russ has few controls, that mostly follow a small subset of vim's controls.
 If you know vim, Russ should feel natural.
-The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `c`, `Esc`, `Enter`.
+The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `c`, `o`, `Esc`, `Enter`.
 Pressing `?` shows/hides the help section that describes these controls.
 
 ### insert mode
