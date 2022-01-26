@@ -10,8 +10,8 @@ edition = "2021"
 anyhow = "1.0"
 atom_syndication = { version = "0.11", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-copypasta = { git = "https://github.com/alacritty/copypasta", rev = "5a4c6dc"}
-crossterm = "0.20"
+copypasta = { git = "https://github.com/alacritty/copypasta", rev = "ecafec9" }
+crossterm = "0.22.1"
 diligent-date-parser = "0.1"
 futures-util = "0.3"
 html2text = "0.2"
@@ -22,8 +22,8 @@ rss = { version = "2.0", default-features = false }
 rusqlite = { version = "0.26", features = ["bundled", "chrono"] }
 structopt = "0.3"
 tokio = { version = "1", features = ["rt", "time"] }
-tui = { version = "0.16", default-features = false, features = ["crossterm"] }
-ureq = "2.3"
+tui = "0.17"
+ureq = "2.4"
 wsl = "0.1"
 webbrowser = { git = "https://github.com/codota/webbrowser-rs", branch = "feature/add-suppress-output-flag-with-docs" }
 
