@@ -547,10 +547,7 @@ impl AppImpl {
     }
 
     fn open_link_in_browser(&self) -> Result<()> {
-        webbrowser::open_browser_with_options(
-            webbrowser::BrowserOptions::create_with_suppressed_output(&self.get_current_link()),
-        )
-        .map(|_| ())
+        webbrowser::open(&self.get_current_link())
         .map_err(|e| anyhow::anyhow!(e))
     }
 
