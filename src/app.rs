@@ -378,7 +378,7 @@ impl AppImpl {
                             let entry_html = entry
                                 .content
                                 .as_ref()
-                                .or_else(|| entry.description.as_ref())
+                                .or(entry.description.as_ref())
                                 .or(Some(&empty_string));
 
                             // minimum is 1
@@ -547,8 +547,7 @@ impl AppImpl {
     }
 
     fn open_link_in_browser(&self) -> Result<()> {
-        webbrowser::open(&self.get_current_link())
-        .map_err(|e| anyhow::anyhow!(e))
+        webbrowser::open(&self.get_current_link()).map_err(|e| anyhow::anyhow!(e))
     }
 
     fn is_wsl(&mut self) -> bool {

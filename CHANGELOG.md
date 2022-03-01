@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Bring `webbrowser` dependency up to mainline, thank you @amodm (https://github.com/ckampfe/russ/pull/4)
+- Fix clippys/formatting
 
 ## 0.3.0
 
