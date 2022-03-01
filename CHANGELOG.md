@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Bring `webbrowser` dependency up to mainline, thank you @amodm (https://github.com/ckampfe/russ/pull/4)
+
 ## 0.3.0
 
 - `russ --version` now reports the numeric verison (e.x.: `0.3.0`) rather than a git commit hash.
