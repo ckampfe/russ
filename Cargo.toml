@@ -25,7 +25,7 @@ tokio = { version = "1", features = ["rt", "time"] }
 tui = "0.17"
 ureq = "2.4"
 wsl = "0.1"
-webbrowser = { git = "https://github.com/codota/webbrowser-rs", branch = "feature/add-suppress-output-flag-with-docs" }
+webbrowser = "0.6"
 
 [profile.release]
 codegen-units = 1
