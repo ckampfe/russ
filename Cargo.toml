@@ -17,9 +17,9 @@ futures-util = "0.3"
 html2text = "0.2"
 num_cpus = "1.13"
 r2d2 = "0.8"
-r2d2_sqlite = "0.19"
+r2d2_sqlite = "0.20"
 rss = { version = "2.0", default-features = false }
-rusqlite = { version = "0.26", features = ["bundled", "chrono"] }
+rusqlite = { version = "0.27", features = ["bundled", "chrono"] }
 structopt = "0.3"
 tokio = { version = "1", features = ["rt", "time"] }
 tui = "0.17"
