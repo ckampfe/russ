@@ -60,6 +60,7 @@ impl App {
         (put_current_link_in_clipboard, Result<()>),
         (reset_feed_subscription_input, ()),
         (select_feeds, ()),
+        (delete_feed, Result<()>),
         (toggle_help, Result<()>),
         (toggle_read, Result<()>),
         (toggle_read_mode, Result<()>),
@@ -238,6 +239,36 @@ impl AppImpl {
         app.update_current_feed_and_entries()?;
 
         Ok(app)
+    }
+
+    pub fn delete_feed(&mut self) -> Result<()> {
+        if matches!(self.selected, Selected::Feeds) && matches!(self.mode(), Mode::Editing) {
+            let feed_id = self.selected_feed_id();
+            crate::rss::delete_feed(&mut self.conn, feed_id)?;
+
+            // Remove the feed in app state
+            let feeds_len = self.feeds.items.len();
+
+            for i in 0..feeds_len {
+                if self.feeds.items[i].id == feed_id {
+                    self.feeds.items.remove(i);
+
+                    if i == feeds_len - 1 {
+                        self.feeds.previous();
+                    }
+
+                    break;
+                }
+            }
+
+            // Remove the entries from the feed in app state
+            self.entries.items.retain(|entry| entry.feed_id != feed_id);
+
+            // Update
+            self.update_current_feed_and_entries()?;
+        }
+
+        Ok(())
     }
 
     pub fn update_feeds(&mut self) -> Result<()> {

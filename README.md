@@ -70,6 +70,7 @@ Press `q` or `Esc` to quit Russ.
 `i` - insert mode
 `Enter` - refresh the currently input feed (insert mode)
 `Enter` - read selected entry
+`Del` - delete selected feed (insert mode)
 `r` - refresh single feed (context dependent)
 `r` - mark entry as read (context dependent)
 `a` - view read/unread entries
@@ -129,7 +130,6 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [ ] migration process for database changes
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
-- [ ] deleting feeds
 
 ### done
 
@@ -138,6 +138,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] vim-style hjkl navigation
 - [x] subscribe to a feed
 - [x] refresh a feed
+- [x] delete a feed
 - [x] mark entries as read
 - [x] mark entries as unread
 - [x] view only unread entries
