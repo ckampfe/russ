@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Bring `webbrowser` dependency up to mainline, thank you @amodm (https://github.com/ckampfe/russ/pull/4)
+- Bring `webbrowser` dependency up to mainline, thank you @amodm ([#4](https://github.com/ckampfe/russ/pull/4))
+- Add ability to delete a feed and its entries, thank you @Funami580 ([#3](https://github.com/ckampfe/russ/pull/3))
 - Fix clippys/formatting
 
 ## 0.3.0
