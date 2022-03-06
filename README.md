@@ -168,7 +168,7 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 ## minimum supported version policy
 
 Russ targets the latest stable version of the Rust compiler. Older Rust versions may work, but building Russ against non-latest stable versions is not a project goal.
-Russ compiles and bundles its own embedded Sqlite, which is version 3.35.4.
+Russ compiles and bundles its own embedded Sqlite, which is version 3.38.0.
 
 ## license
 
