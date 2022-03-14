@@ -14,7 +14,7 @@ copypasta = { git = "https://github.com/alacritty/copypasta", rev = "ecafec9" }
 crossterm = "0.22.1"
 diligent-date-parser = "0.1"
 futures-util = "0.3"
-html2text = "0.2"
+html2text = "0.3"
 num_cpus = "1.13"
 r2d2 = "0.8"
 r2d2_sqlite = "0.20"

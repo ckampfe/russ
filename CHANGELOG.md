@@ -5,6 +5,7 @@
 - Bring `webbrowser` dependency up to mainline, thank you @amodm ([#4](https://github.com/ckampfe/russ/pull/4))
 - Add ability to delete a feed and its entries, thank you @Funami580 ([#3](https://github.com/ckampfe/russ/pull/3))
 - Bump `rusqlite` to `0.27` and `r2d2_sqlite` to `0.20`
+- Bump `html2text` to `0.3`
 - Fix clippys/formatting
 - Bump a lot of transitive dependencies
 
