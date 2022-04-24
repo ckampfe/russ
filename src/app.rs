@@ -581,6 +581,7 @@ impl AppImpl {
         webbrowser::open(&self.get_current_link()).map_err(|e| anyhow::anyhow!(e))
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn is_wsl(&mut self) -> bool {
         if let Some(is_wsl) = self.is_wsl {
             is_wsl
