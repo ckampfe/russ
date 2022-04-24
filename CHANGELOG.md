@@ -1,6 +1,10 @@
 # Changelog
 
+I welcome contributions. If you have an idea for a contribution, open an issue and we can talk about it.
+
 ## Unreleased
+
+## 0.4.0
 
 - Bring `webbrowser` dependency up to mainline, thank you @amodm ([#4](https://github.com/ckampfe/russ/pull/4))
 - Add ability to delete a feed and its entries, thank you @Funami580 ([#3](https://github.com/ckampfe/russ/pull/3))

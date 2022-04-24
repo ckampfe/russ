@@ -83,24 +83,30 @@ Press `q` or `Esc` to quit Russ.
 
 ```
 $ russ -h
-russ eae8d47
+russ 0.4.0
+Clark Kampfe <clark.kampfe@gmail.com>
 
 USAGE:
-    russ [OPTIONS] --database-path <database-path>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+    russ [OPTIONS] --database-path <DATABASE_PATH>
 
 OPTIONS:
-    -d, --database-path <database-path>                                      feed database path
-    -f, --flash-display-duration-seconds <flash-display-duration-seconds>
+    -d, --database-path <DATABASE_PATH>
+            feed database path
+
+    -f, --flash-display-duration-seconds <FLASH_DISPLAY_DURATION_SECONDS>
             number of seconds to show the flash message before clearing it [default: 4]
 
-    -n, --network-timeout <network-timeout>
+    -h, --help
+            Print help information
+
+    -n, --network-timeout <NETWORK_TIMEOUT>
             RSS/Atom network request timeout in seconds [default: 5]
 
-    -t, --tick-rate <tick-rate>                                              time in ms between two ticks [default: 250]
+    -t, --tick-rate <TICK_RATE>
+            time in ms between two ticks [default: 250]
+
+    -V, --version
+            Print version information
 ```
 
 ## design
