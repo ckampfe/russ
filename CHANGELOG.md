@@ -7,6 +7,7 @@
 - Use `clap` and its derive instead of `structopt`
 - Bump `rusqlite` to `0.27` and `r2d2_sqlite` to `0.20`
 - Bump `html2text` to `0.3`
+- Bump `webbrowser` to `0.7`
 - Fix clippys/formatting
 - Bump a lot of transitive dependencies
 
