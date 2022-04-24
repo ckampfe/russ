@@ -3,6 +3,7 @@
 use crate::modes::{Mode, Selected};
 use anyhow::Result;
 use app::App;
+use clap::Parser;
 use crossterm::event;
 use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
 use crossterm::execute;
@@ -14,7 +15,6 @@ use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::{thread, time};
-use structopt::StructOpt;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
@@ -29,20 +29,20 @@ pub enum Event<I> {
     Tick,
 }
 
-#[derive(Clone, Debug, StructOpt)]
-#[structopt(name = "russ")]
+#[derive(Clone, Debug, Parser)]
+#[clap(author, version, about, name = "russ")]
 pub struct Options {
     /// feed database path
-    #[structopt(short, long)]
+    #[clap(short, long)]
     database_path: PathBuf,
     /// time in ms between two ticks
-    #[structopt(short, long, default_value = "250")]
+    #[clap(short, long, default_value = "250")]
     tick_rate: u64,
     /// number of seconds to show the flash message before clearing it
-    #[structopt(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
+    #[clap(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
     flash_display_duration_seconds: time::Duration,
     /// RSS/Atom network request timeout in seconds
-    #[structopt(short, long, default_value = "5", parse(try_from_str = parse_seconds))]
+    #[clap(short, long, default_value = "5", parse(try_from_str = parse_seconds))]
     network_timeout: time::Duration,
 }
 
@@ -209,7 +209,7 @@ async fn clear_flash_after(sx: &mpsc::Sender<IoCommand>, duration: &time::Durati
 }
 
 fn main() -> Result<()> {
-    let options: Options = Options::from_args();
+    let options: Options = Options::parse();
 
     enable_raw_mode()?;
 
@@ -332,7 +332,7 @@ fn main() -> Result<()> {
                     KeyCode::Backspace => app.pop_feed_subscription_input(),
                     KeyCode::Delete => {
                         app.delete_feed()?;
-                    },
+                    }
                     KeyCode::Esc => {
                         app.set_mode(Mode::Normal);
                     }

@@ -10,6 +10,7 @@ edition = "2021"
 anyhow = "1.0"
 atom_syndication = { version = "0.11", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "3", features = ["derive"] }
 copypasta = { git = "https://github.com/alacritty/copypasta", rev = "ecafec9" }
 crossterm = "0.22.1"
 diligent-date-parser = "0.1"
@@ -20,7 +21,6 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.20"
 rss = { version = "2.0", default-features = false }
 rusqlite = { version = "0.27", features = ["bundled", "chrono"] }
-structopt = "0.3"
 tokio = { version = "1", features = ["rt", "time"] }
 tui = "0.17"
 ureq = "2.4"
