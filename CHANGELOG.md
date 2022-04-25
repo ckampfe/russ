@@ -4,6 +4,7 @@ I welcome contributions. If you have an idea for a contribution, open an issue a
 
 ## Unreleased
 
+- Group operations that mutate the database into meaningful transactions
 - Bump `html2text` to `0.4`
 
 ## 0.4.0

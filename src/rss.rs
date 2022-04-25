@@ -233,12 +233,15 @@ impl FromStr for FeedAndEntries {
 
 pub fn subscribe_to_feed(
     http_client: &ureq::Agent,
-    conn: &rusqlite::Connection,
+    conn: &mut rusqlite::Connection,
     url: &str,
 ) -> Result<FeedId> {
     let feed_and_entries: FeedAndEntries = fetch_feed(http_client, url)?;
-    let feed_id = create_feed(conn, &feed_and_entries.feed)?;
-    add_entries_to_feed(conn, feed_id, &feed_and_entries.entries)?;
+    let feed_id = in_transaction(conn, |tx| {
+        let feed_id = create_feed(tx, &feed_and_entries.feed)?;
+        add_entries_to_feed(tx, feed_id, &feed_and_entries.entries)?;
+        Ok(feed_id)
+    })?;
 
     Ok(feed_id)
 }
@@ -256,7 +259,7 @@ fn fetch_feed(http_client: &ureq::Agent, url: &str) -> Result<FeedAndEntries> {
 /// TODO hash the content to see if anything changed, and update that way.
 pub fn refresh_feed(
     client: &ureq::Agent,
-    conn: &rusqlite::Connection,
+    conn: &mut rusqlite::Connection,
     feed_id: FeedId,
 ) -> Result<()> {
     let feed_url = get_feed_url(conn, feed_id).with_context(|| {
@@ -265,8 +268,10 @@ pub fn refresh_feed(
             feed_id
         )
     })?;
+
     let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)
         .with_context(|| format!("Failed to fetch feed {}", feed_url))?;
+
     let remote_items = remote_feed.entries;
     let remote_items_links = remote_items
         .iter()
@@ -292,16 +297,19 @@ pub fn refresh_feed(
         })
         .collect::<Vec<_>>();
 
-    add_entries_to_feed(conn, feed_id, &items_to_add)?;
-
-    update_feed_refreshed_at(conn, feed_id)?;
+    in_transaction(conn, |tx| {
+        add_entries_to_feed(tx, feed_id, &items_to_add)?;
+        update_feed_refreshed_at(tx, feed_id)?;
+        Ok(())
+    })?;
 
     Ok(())
 }
 
-pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS feeds (
+pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
+    in_transaction(conn, |tx| {
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
         feed_link TEXT,
@@ -310,12 +318,12 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
         refreshed_at TIMESTAMP,
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )",
-        [],
-    )?;
+        )",
+            [],
+        )?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS entries (
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         feed_id INTEGER,
         title TEXT,
@@ -328,20 +336,21 @@ pub fn initialize_db(conn: &rusqlite::Connection) -> Result<()> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
-        [],
-    )?;
+            [],
+        )?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index 
+        tx.execute(
+            "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index
         ON entries (feed_id, pub_date, inserted_at)",
-        [],
-    )?;
+            [],
+        )?;
 
-    Ok(())
+        Ok(())
+    })
 }
 
-fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
-    let feed_id = conn.query_row::<FeedId, _, _>(
+fn create_feed(tx: &rusqlite::Transaction, feed: &Feed) -> Result<FeedId> {
+    let feed_id = tx.query_row::<FeedId, _, _>(
         "INSERT INTO feeds (title, link, feed_link, feed_kind)
         VALUES (?1, ?2, ?3, ?4)
         RETURNING id",
@@ -353,15 +362,15 @@ fn create_feed(conn: &rusqlite::Connection, feed: &Feed) -> Result<FeedId> {
 }
 
 pub fn delete_feed(conn: &mut rusqlite::Connection, feed_id: FeedId) -> Result<()> {
-    let tx = conn.transaction()?;
-    tx.execute("DELETE FROM feeds WHERE id = ?1", params![feed_id])?;
-    tx.execute("DELETE FROM entries WHERE feed_id = ?1", params![feed_id])?;
-    tx.commit()?;
-    Ok(())
+    in_transaction(conn, |tx| {
+        tx.execute("DELETE FROM feeds WHERE id = ?1", params![feed_id])?;
+        tx.execute("DELETE FROM entries WHERE feed_id = ?1", params![feed_id])?;
+        Ok(())
+    })
 }
 
 fn add_entries_to_feed(
-    conn: &rusqlite::Connection,
+    tx: &rusqlite::Transaction,
     feed_id: FeedId,
     entries: &[Entry],
 ) -> Result<()> {
@@ -397,7 +406,7 @@ fn add_entries_to_feed(
 
         let query = build_bulk_insert_query("entries", &columns, entries);
 
-        conn.execute(&query, entries_values.as_slice())?;
+        tx.execute(&query, entries_values.as_slice())?;
     }
 
     Ok(())
@@ -472,8 +481,8 @@ pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
     Ok(s)
 }
 
-fn update_feed_refreshed_at(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<()> {
-    conn.execute(
+fn update_feed_refreshed_at(tx: &rusqlite::Transaction, feed_id: FeedId) -> Result<()> {
+    tx.execute(
         "UPDATE feeds SET refreshed_at = ?2 WHERE id = ?1",
         params![feed_id, Utc::now()],
     )?;
@@ -659,6 +668,21 @@ pub fn get_entries_links(
     Ok(links)
 }
 
+/// run `f` in a transaction, committing if `f` returns an `Ok` value,
+/// otherwise rolling back.
+fn in_transaction<F, R>(conn: &mut rusqlite::Connection, f: F) -> Result<R>
+where
+    F: Fn(&rusqlite::Transaction) -> Result<R>,
+{
+    let tx = conn.transaction()?;
+
+    let result = f(&tx)?;
+
+    tx.commit()?;
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,9 +702,9 @@ mod tests {
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(5))
             .build();
-        let conn = rusqlite::Connection::open_in_memory().unwrap();
-        initialize_db(&conn).unwrap();
-        subscribe_to_feed(&http_client, &conn, ZCT).unwrap();
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        initialize_db(&mut conn).unwrap();
+        subscribe_to_feed(&http_client, &mut conn, ZCT).unwrap();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM entries", [], |row| row.get(0))
             .unwrap();
@@ -693,12 +717,12 @@ mod tests {
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(5))
             .build();
-        let conn = rusqlite::Connection::open_in_memory().unwrap();
-        initialize_db(&conn).unwrap();
-        subscribe_to_feed(&http_client, &conn, ZCT).unwrap();
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        initialize_db(&mut conn).unwrap();
+        subscribe_to_feed(&http_client, &mut conn, ZCT).unwrap();
         let feed_id = 1;
         let old_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
-        refresh_feed(&http_client, &conn, feed_id).unwrap();
+        refresh_feed(&http_client, &mut conn, feed_id).unwrap();
         let e = get_entry_meta(&conn, 1).unwrap();
         e.mark_as_read(&conn).unwrap();
         let new_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
@@ -727,5 +751,53 @@ mod tests {
             query,
             "INSERT INTO entries(feed_id, title, author, pub_date, description, content, link, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8), (?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)"
         );
+    }
+
+    #[test]
+    fn works_transactionally() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+
+        conn.execute("CREATE TABLE foo (t)", []).unwrap();
+
+        let count: i64 = conn
+            .query_row("select count(*) from foo", [], |row| row.get(0))
+            .unwrap();
+
+        // should be nothing in the table
+        assert_eq!(count, 0);
+
+        // insert one row to prove it works
+        let _ = in_transaction(&mut conn, |tx| {
+            tx.execute(r#"INSERT INTO foo (t) values ("some initial string")"#, [])?;
+            Ok(())
+        });
+
+        let count: i64 = conn
+            .query_row("select count(*) from foo", [], |row| row.get(0))
+            .unwrap();
+
+        // we inserted one row, there should be one
+        assert_eq!(count, 1);
+
+        // do 2 inserts in the same way as before, but error in the middle of the inserts.
+        // this should rollback
+        let tr = in_transaction(&mut conn, |tx| {
+            tx.execute(r#"INSERT INTO foo (t) values ("some string")"#, [])?;
+            tx.execute("this is not valid sql, it should error and rollback", [])?;
+            tx.execute(r#"INSERT INTO foo (t) values ("some other string")"#, [])?;
+
+            Ok(())
+        });
+
+        // it should be an error
+        let e = tr.unwrap_err();
+        assert!(e.to_string().contains("syntax error"));
+
+        let count: i64 = conn
+            .query_row("select count(*) from foo", [], |row| row.get(0))
+            .unwrap();
+
+        // assert that no further entries have been inserted
+        assert_eq!(count, 1);
     }
 }

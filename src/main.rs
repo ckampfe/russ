@@ -128,10 +128,10 @@ async fn async_io_loop(
                 app.set_flash("Subscribing to feed...".to_string());
                 app.force_redraw()?;
 
-                let conn = connection_pool.get()?;
+                let mut conn = connection_pool.get()?;
                 let r = crate::rss::subscribe_to_feed(
                     &app.http_client(),
-                    &conn,
+                    &mut conn,
                     &feed_subscription_input,
                 );
 
@@ -186,8 +186,8 @@ where
         // and using `tokio::task::spawn` with a blocking call has the potential to block
         // the scheduler
         tokio::task::spawn_blocking(move || {
-            let conn = pool_get_result?;
-            crate::rss::refresh_feed(&http, &conn, feed_id)?;
+            let mut conn = pool_get_result?;
+            crate::rss::refresh_feed(&http, &mut conn, feed_id)?;
             Ok(())
         })
     });

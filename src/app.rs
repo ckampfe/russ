@@ -198,13 +198,13 @@ impl AppImpl {
         options: crate::Options,
         event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
     ) -> Result<AppImpl> {
-        let conn = rusqlite::Connection::open(&options.database_path)?;
+        let mut conn = rusqlite::Connection::open(&options.database_path)?;
 
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(options.network_timeout)
             .build();
 
-        crate::rss::initialize_db(&conn)?;
+        crate::rss::initialize_db(&mut conn)?;
         let feeds: util::StatefulList<crate::rss::Feed> = vec![].into();
         let entries: util::StatefulList<crate::rss::EntryMeta> = vec![].into();
         let selected = Selected::Feeds;
