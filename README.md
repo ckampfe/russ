@@ -24,60 +24,37 @@ I do not currently publish binary releases, but that may change if someone is in
 
 ## use
 
-Russ has few controls, that mostly follow a small subset of vim's controls.
-If you know vim, Russ should feel natural.
-The only controls are `hjkl` (or arrow keys), `i`, `r`, `a`, `x`, `q`, `c`, `o`, `Esc`, `Enter`.
-Pressing `?` shows/hides the help section that describes these controls.
+Russ is modal, like vim. If you are comfortable with vim, or know of vim, you are probably going to be immediately comfortable with Russ. If you don't know vim, don't be afraid! If you read the following controls section and tinker a bit, you'll have no trouble using Russ.
 
-### insert mode
+There are two modes: normal mode and insert mode.
 
-To subscribe to your first feed, you will need to be in `insert` mode.
-Press `i` to enter `insert` mode, where you can type the URL of and RSS or Atom feed you want to subscribe to.
-Press `Enter` to subscribe to a feed and fetch all entries.
-If this operation is successful, title of the feed will appear in the left column, and its unread entries on the right.
-Press `Esc` to exit `insert` mode and return to `normal` mode.
-This is how you subscribe to RSS/Atom feeds in Russ.
+In normal mode, you read your RSS entries, navigate between entries, navigate between feeds, refresh feeds, and a few other things. This is where you spend 99% of your time when using Russ.
 
-### normal mode
+When you want to start following a new feed, you enter insert mode.
+In insert mode, you enter the URL of a feed you wish to begin following, and Russ will download that feed for you.
 
-`Normal` mode is where you spend most of your time using Russ.
-It is where you read RSS/Atom entries and refresh feeds.
+That's basically it!
 
-Navigation in `normal` mode is spatial.
-Navigating right takes you in a more specific direction (all feeds -> a single feed's entries -> a single entry),
-and navigating left takes you in a more general direction (a single entry -> a single feed's entries -> all feeds).
-Use `hjkl` or the arrow keys to navigate between the left (context) column and the right (reading) column.
-The cursor indicates where you are.
+### controls - normal mode
 
-You can scroll down/up in a list or an entry with `j`/`k` or `down`/`up`.
-To mark a selected entry as read, press `r`.
-By default, Russ will only show unread entries, so any entries marked read will disappear from the entry list.
-To view entries you have marked read, press `a`. You can mark them unread by pressing `r` on a selected entry.
-To view entries that are unread (the default state), press `a` again.
+Some normal mode controls vary based on whether you are currently selecting a feed or an entry.
 
-Pressing `c` copies the URL of the current feed or entry to your clipboard, depending on which is in focus.
-Pressing `o` opens the URL in your default browser.
-
-To refresh a single feed, press `r` when you are in the most general context (all the way to the left) and that feed is highlighted.
-To refresh all feeds, press `x` when in the most general context.
-Press `q` or `Esc` to quit Russ.
-
-### quick reference
-
-`hjkl`/arrows - move
-`q` - quit
-`Esc` - quit (in normal mode)
-`i` - insert mode
-`Enter` - refresh the currently input feed (insert mode)
+`q`/`Esc` - quit Russ
+`hjkl`/arrows - move up/down/left/right between feeds and entries, scroll up/down on an entry
 `Enter` - read selected entry
-`Del` - delete selected feed (insert mode)
-`r` - refresh single feed (context dependent)
-`r` - mark entry as read (context dependent)
-`a` - view read/unread entries
+`r` - refresh the selected feed
+`r` - mark the selected entry as read
 `x` - refresh all feeds
-`c` - copy current entry link or feed link to clipboard (depending on selection)
-`o` - open current entry link or feed link in browser  (depending on selection)
-`Esc` - go from insert mode to normal mode
+`i` - change to insert mode
+`a` - toggle between read/unread entries
+`c` - copy the selected link to the clipboard (feed or entry)
+`o` - open the selected link in your browser (feed or entry)
+
+### controls - insert mode
+
+`Esc` - go back to normal mode
+`Enter` - subscribe to the feed you just typed in the input box
+`Del` - delete the selected feed.
 
 ## help/options/config
 
@@ -112,21 +89,17 @@ OPTIONS:
 ## design
 
 By design, Russ is non-eager. It will not automaticlly refresh your subscriptions on a timer, it will not automatically mark entries as read. It will do these things when you tell it to.
-Russ is designed such that it should be possible to use it 100% offline. You should be able to load it up with new feeds and entries and fly to Australia, and not have Russ complain when the plane's Wifi fails. As long as you have a copy of Russ and a SQLite database of your RSS/Atom feeds, it should work.
+Russ is designed to be 100% usable offline, with no internet connection. You should be able to load it up with new feeds and entries and fly to Australia, and not have Russ complain when the plane's Wifi fails. As long as you have a copy of Russ and a SQLite database of your RSS/Atom feeds, you will be able to read your RSS/Atom feeds.
 
-Russ is a [tui](https://crates.io/crates/tui) app that uses [crossterm](https://crates.io/crates/crossterm), so it should (???) work on Windows (I do not use Windows so I cannot verify this, but feel free to open an issue with an experience report)
+Russ is a [tui](https://crates.io/crates/tui) app that uses [crossterm](https://crates.io/crates/crossterm). I develop and use Russ primarily on a Mac, but I have run it successfully on Linux and WSL. It should be possible to use Russ on Windows, but I have not personally used Russ on Windows, so I cannot verify this. If you use Russ on Windows or have tried to use Russ on Windows, please open an issue and let me know!
 
 ## stability
 
-At this time, I cannot guarantee any kind of stability of interfaces or database schema.
-I reserve the right to change Russ or its database format at any time.
-That said: Russ is generally stable! I use it every day to read my feeds, and I don't believe I've broken either the config or the database schema in quite a while. It works pretty well at this point.
-I have no major features planned that would require breaking schema or interface changes.
-I will do my best not to break any data contracts, and will change this text if I believe that Russ has stabilized enough to be considered "stable" or "1.0".
+The application-level and database-level contracts encoded in Russ are stable. I can't remember the last time I broke one. That said, I still reserve the right to break application or database contracts to fix things, but I have no reason to believe this will happen. I use Russ every day, and it basically "just works". If you use Russ and this is not the case for you, please open an issue and let me know.
 
 ## features
 
-This is not a strict feature list. Unchecked items are ideas to explore rather than features that are going to be built.
+This is not a strict feature list, and it is not a roadmap. Unchecked items are ideas to explore rather than features that are going to be built. If you have an idea for a feature that you would enjoy, open an issue and we can talk about it.
 
 ### todo
 
@@ -171,10 +144,18 @@ This is not a strict feature list. Unchecked items are ideas to explore rather t
 - [x] automatic line length for wrapping
 - [x] ability to open the current link in your default browser
 
-## minimum supported version policy
+## Minimum Supported Rust Version (MSRV) policy
 
-Russ targets the latest stable version of the Rust compiler. Older Rust versions may work, but building Russ against non-latest stable versions is not a project goal.
-Russ compiles and bundles its own embedded Sqlite, which is version 3.38.0.
+Russ targets the latest stable version of the Rust compiler. Older Rust versions may work, but building Russ against non-latest stable versions is not a project goal and is not supported.
+Likewise, Russ may build with a nightly Rust compiler, but this is not a project goal.
+
+## sqlite version
+
+Russ compiles and bundles its own embedded Sqlite via the [Rusqlite](https://github.com/rusqlite/rusqlite) project, which is version 3.38.2.
+
+## contributing
+
+I welcome contributions to Russ. If you have an idea for something you would like to contribute, open an issue and we can talk about it!
 
 ## license
 

@@ -1,9 +1,10 @@
 # Changelog
 
-I welcome contributions. If you have an idea for a contribution, open an issue and we can talk about it.
+I welcome contributions to Russ. If you have an idea for something you would like to contribute, open an issue and we can talk about it!
 
 ## Unreleased
 
+- Tidy up the [README](README.md)
 - Group operations that mutate the database into meaningful transactions
 - Bump `html2text` to `0.4`
 
