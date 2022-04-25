@@ -37,22 +37,22 @@ That's basically it!
 
 Some normal mode controls vary based on whether you are currently selecting a feed or an entry.
 
-`q`/`Esc` - quit Russ
-`hjkl`/arrows - move up/down/left/right between feeds and entries, scroll up/down on an entry
-`Enter` - read selected entry
-`r` - refresh the selected feed
-`r` - mark the selected entry as read
-`x` - refresh all feeds
-`i` - change to insert mode
-`a` - toggle between read/unread entries
-`c` - copy the selected link to the clipboard (feed or entry)
-`o` - open the selected link in your browser (feed or entry)
+- `q`/`Esc` - quit Russ
+- `hjkl`/arrows - move up/down/left/right between feeds and entries, scroll up/down on an entry
+- `Enter` - read selected entry
+- `r` - refresh the selected feed
+- `r` - mark the selected entry as read
+- `x` - refresh all feeds
+- `i` - change to insert mode
+- `a` - toggle between read/unread entries
+- `c` - copy the selected link to the clipboard (feed or entry)
+- `o` - open the selected link in your browser (feed or entry)
 
 ### controls - insert mode
 
-`Esc` - go back to normal mode
-`Enter` - subscribe to the feed you just typed in the input box
-`Del` - delete the selected feed.
+- `Esc` - go back to normal mode
+- `Enter` - subscribe to the feed you just typed in the input box
+- `Del` - delete the selected feed.
 
 ## help/options/config
 
