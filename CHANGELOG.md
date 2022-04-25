@@ -4,6 +4,8 @@ I welcome contributions. If you have an idea for a contribution, open an issue a
 
 ## Unreleased
 
+- Bump `html2text` to `0.4`
+
 ## 0.4.0
 
 - Bring `webbrowser` dependency up to mainline, thank you @amodm ([#4](https://github.com/ckampfe/russ/pull/4))
