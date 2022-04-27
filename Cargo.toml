@@ -14,14 +14,12 @@ clap = { version = "3", features = ["derive"] }
 copypasta = { git = "https://github.com/alacritty/copypasta", rev = "ecafec9" }
 crossterm = "0.23.2"
 diligent-date-parser = "0.1"
-futures-util = "0.3"
 html2text = "0.4"
 num_cpus = "1.13"
 r2d2 = "0.8"
 r2d2_sqlite = "0.20"
 rss = { version = "2.0", default-features = false }
 rusqlite = { version = "0.27", features = ["bundled", "chrono"] }
-tokio = { version = "1", features = ["rt", "time"] }
 tui = "0.18"
 ureq = "2.4"
 wsl = "0.1"

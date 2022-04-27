@@ -10,7 +10,6 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use futures_util::StreamExt;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -59,9 +58,9 @@ enum IoCommand {
     ClearFlash,
 }
 
-async fn async_io_loop(
+fn io_loop(
     app: App,
-    sx: &mpsc::Sender<IoCommand>,
+    sx: mpsc::Sender<IoCommand>,
     rx: mpsc::Receiver<IoCommand>,
     options: &Options,
 ) -> Result<()> {
@@ -83,14 +82,13 @@ async fn async_io_loop(
                     if let Err(e) = fetch_result {
                         app.push_error_flash(e)
                     }
-                })
-                .await?;
+                })?;
 
                 app.update_current_feed_and_entries()?;
                 let elapsed = now.elapsed();
                 app.set_flash(format!("Refreshed feed in {:?}", elapsed));
                 app.force_redraw()?;
-                clear_flash_after(sx, &options.flash_display_duration_seconds).await;
+                clear_flash_after(sx.clone(), options.flash_display_duration_seconds);
             }
             RefreshFeeds(feed_ids) => {
                 let now = std::time::Instant::now();
@@ -106,8 +104,7 @@ async fn async_io_loop(
                         Ok(_) => successfully_refreshed_len += 1,
                         Err(e) => app.push_error_flash(e),
                     }
-                })
-                .await?;
+                })?;
 
                 {
                     app.update_current_feed_and_entries()?;
@@ -120,7 +117,7 @@ async fn async_io_loop(
                     app.force_redraw()?;
                 }
 
-                clear_flash_after(sx, &options.flash_display_duration_seconds).await;
+                clear_flash_after(sx.clone(), options.flash_display_duration_seconds);
             }
             SubscribeToFeed(feed_subscription_input) => {
                 let now = std::time::Instant::now();
@@ -153,7 +150,7 @@ async fn async_io_loop(
                             app.force_redraw()?;
                         }
 
-                        clear_flash_after(sx, &options.flash_display_duration_seconds).await;
+                        clear_flash_after(sx.clone(), options.flash_display_duration_seconds);
                     }
                     Err(e) => {
                         app.push_error_flash(e);
@@ -169,43 +166,59 @@ async fn async_io_loop(
     Ok(())
 }
 
-async fn refresh_feeds<'a, F>(
+fn refresh_feeds<F>(
     app: &App,
     connection_pool: &r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
     feed_ids: &[crate::rss::FeedId],
-    mut f: F,
+    mut refresh_result_handler: F,
 ) -> Result<()>
 where
     F: FnMut(&App, anyhow::Result<()>),
 {
-    let feed_ids = feed_ids.to_owned();
-    let requests_stream = futures_util::stream::iter(feed_ids).map(|feed_id| {
-        let pool_get_result = connection_pool.get();
-        let http = app.http_client();
-        // `tokio::task::spawn_blocking` here because the http client `ureq` is blocking,
-        // and using `tokio::task::spawn` with a blocking call has the potential to block
-        // the scheduler
-        tokio::task::spawn_blocking(move || {
-            let mut conn = pool_get_result?;
-            crate::rss::refresh_feed(&http, &mut conn, feed_id)?;
-            Ok(())
+    let min_number_of_threads = num_cpus::get() * 2;
+    let chunk_size = feed_ids.len() / min_number_of_threads;
+    // due to usize floor division, it's possible chunk_size would be 0,
+    // so ensure it is at least 1
+    let chunk_size = chunk_size.max(1);
+    let chunks = feed_ids.chunks(chunk_size);
+
+    let join_handles: Vec<_> = chunks
+        .map(|chunk_feed_ids| {
+            let pool_get_result = connection_pool.get();
+            let http = app.http_client();
+            let chunk_feed_ids = chunk_feed_ids.to_owned();
+
+            thread::spawn(move || -> Result<Vec<Result<(), anyhow::Error>>> {
+                let mut results = vec![];
+                let mut conn = pool_get_result?;
+
+                for feed_id in chunk_feed_ids.into_iter() {
+                    results.push(crate::rss::refresh_feed(&http, &mut conn, feed_id))
+                }
+
+                Ok::<Vec<Result<(), anyhow::Error>>, anyhow::Error>(results)
+            })
         })
-    });
+        .collect();
 
-    let mut buffered_requests = requests_stream.buffer_unordered(num_cpus::get() * 2);
-
-    while let Some(task_join_result) = buffered_requests.next().await {
-        let fetch_result = task_join_result?;
-        f(app, fetch_result)
+    for join_handle in join_handles {
+        let chunk_results = join_handle
+            .join()
+            .expect("unable to join worker thread to io thread");
+        for chunk_result in chunk_results? {
+            refresh_result_handler(app, chunk_result)
+        }
     }
 
     Ok(())
 }
 
-async fn clear_flash_after(sx: &mpsc::Sender<IoCommand>, duration: &time::Duration) {
-    tokio::time::sleep(*duration).await;
-    sx.send(IoCommand::ClearFlash)
-        .expect("Unable to send IOCommand::ClearFlash");
+fn clear_flash_after(sx: mpsc::Sender<IoCommand>, duration: time::Duration) {
+    thread::spawn(move || {
+        thread::sleep(duration);
+        sx.send(IoCommand::ClearFlash)
+            .expect("Unable to send IOCommand::ClearFlash");
+    });
 }
 
 fn main() -> Result<()> {
@@ -257,16 +270,9 @@ fn main() -> Result<()> {
 
     let io_s_clone = io_s.clone();
 
-    // we run tokio in this thread to manage the blocking http calls used to fetch feeds
+    // spawn this thread to handle receiving messages to performing blocking network and db IO
     let io_thread = thread::spawn(move || -> Result<()> {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
-
-        rt.block_on(async move {
-            async_io_loop(cloned_app, &io_s_clone, io_r, &options_clone).await?;
-            Ok(())
-        })
+        io_loop(cloned_app, io_s_clone, io_r, &options_clone)
     });
 
     // MAIN THREAD IS DRAW THREAD

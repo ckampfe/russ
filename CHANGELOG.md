@@ -4,8 +4,10 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 
 ## Unreleased
 
-- Tidy up the [README](README.md)
+- Reimplement the feed refresh functionality to use regular threads instead of `tokio` and `futures-util`.
+- Remove `tokio` and `futures-util`.
 - Group operations that mutate the database into meaningful transactions
+- Tidy up the [README](README.md)
 - Bump `html2text` to `0.4`
 
 ## 0.4.0
