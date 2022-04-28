@@ -3,6 +3,7 @@
 Russ is a TUI RSS/Atom reader with vim-like controls and an offline-first focus.
 
 [![CircleCI](https://circleci.com/gh/ckampfe/russ.svg?style=svg)](https://circleci.com/gh/ckampfe/russ)
+[![Rust](https://github.com/ckampfe/russ/actions/workflows/rust.yml/badge.svg)](https://github.com/ckampfe/russ/actions/workflows/rust.yml)
 
 ---
 
