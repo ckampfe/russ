@@ -9,6 +9,7 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 - Group operations that mutate the database into meaningful transactions
 - Tidy up the [README](README.md)
 - Bump `html2text` to `0.4`
+- Add Github Issue templates, thank you @NickLarsenNZ ([#8](https://github.com/ckampfe/russ/pull/8))
 
 ## 0.4.0
 
