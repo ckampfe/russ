@@ -153,7 +153,7 @@ impl EntryMeta {
 
     fn mark_as_unread(&self, conn: &rusqlite::Connection) -> Result<()> {
         let mut statement = conn.prepare("UPDATE entries SET read_at = NULL WHERE id = ?1")?;
-        statement.execute(params![self.id])?;
+        statement.execute([self.id])?;
         Ok(())
     }
 }
@@ -363,8 +363,8 @@ fn create_feed(tx: &rusqlite::Transaction, feed: &Feed) -> Result<FeedId> {
 
 pub fn delete_feed(conn: &mut rusqlite::Connection, feed_id: FeedId) -> Result<()> {
     in_transaction(conn, |tx| {
-        tx.execute("DELETE FROM feeds WHERE id = ?1", params![feed_id])?;
-        tx.execute("DELETE FROM entries WHERE feed_id = ?1", params![feed_id])?;
+        tx.execute("DELETE FROM feeds WHERE id = ?1", [feed_id])?;
+        tx.execute("DELETE FROM entries WHERE feed_id = ?1", [feed_id])?;
         Ok(())
     })
 }
@@ -459,7 +459,7 @@ fn build_bulk_insert_query<C: AsRef<str>, R>(table: &str, columns: &[C], rows: &
 pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
     let s = conn.query_row(
         "SELECT id, title, feed_link, link, feed_kind, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
-        params![feed_id],
+        [feed_id],
         |row| {
             let feed_kind_str: String = row.get(4)?;
             let feed_kind: FeedKind = FeedKind::from_str(&feed_kind_str)
@@ -493,7 +493,7 @@ fn update_feed_refreshed_at(tx: &rusqlite::Transaction, feed_id: FeedId) -> Resu
 pub fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String> {
     let s: String = conn.query_row(
         "SELECT feed_link FROM feeds WHERE id=?1",
-        params![feed_id],
+        [feed_id],
         |row| row.get(0),
     )?;
 
@@ -555,7 +555,7 @@ pub fn get_entry_meta(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<
           inserted_at, 
           updated_at 
         FROM entries WHERE id=?1",
-        params![entry_id],
+        [entry_id],
         |row| {
             Ok(EntryMeta {
                 id: row.get(0)?,
@@ -577,7 +577,7 @@ pub fn get_entry_meta(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<
 pub fn get_entry_content(conn: &rusqlite::Connection, entry_id: EntryId) -> Result<EntryContent> {
     let result = conn.query_row(
         "SELECT content, description FROM entries WHERE id=?1",
-        params![entry_id],
+        [entry_id],
         |row| {
             Ok(EntryContent {
                 content: row.get(0)?,
@@ -621,7 +621,7 @@ pub fn get_entries_metas(
 
     let mut statement = conn.prepare(&query)?;
     let mut entries = vec![];
-    for entry in statement.query_map(params![feed_id], |row| {
+    for entry in statement.query_map([feed_id], |row| {
         Ok(EntryMeta {
             id: row.get(0)?,
             feed_id: row.get(1)?,
@@ -661,7 +661,7 @@ pub fn get_entries_links(
     let mut links = vec![];
     let mut statement = conn.prepare(&query)?;
 
-    for link in statement.query_map(params![feed_id], |row| row.get(0))? {
+    for link in statement.query_map([feed_id], |row| row.get(0))? {
         links.push(link?);
     }
 
