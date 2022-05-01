@@ -147,6 +147,7 @@ fn io_loop(
 
                             let elapsed = now.elapsed();
                             app.set_flash(format!("Subscribed in {:?}", elapsed));
+                            app.set_mode(Mode::Normal);
                             app.force_redraw()?;
                         }
 

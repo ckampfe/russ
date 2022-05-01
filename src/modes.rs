@@ -3,6 +3,7 @@ pub enum Selected {
     Feeds,
     Entries,
     Entry(crate::rss::EntryMeta),
+    None,
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -190,7 +190,7 @@ pub struct AppImpl {
     pub feed_subscription_input: String,
     pub flash: Option<String>,
     event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
-    is_wsl: Option<bool>,
+    pub is_wsl: bool,
 }
 
 impl AppImpl {
@@ -207,8 +207,13 @@ impl AppImpl {
         crate::rss::initialize_db(&mut conn)?;
         let feeds: util::StatefulList<crate::rss::Feed> = vec![].into();
         let entries: util::StatefulList<crate::rss::EntryMeta> = vec![].into();
-        let selected = Selected::Feeds;
+        // default to having nothing selected,
+        // as it's possible we are starting for the first time,
+        // with an empty feeds db
+        let selected = Selected::None;
         let initial_current_feed = None;
+
+        let is_wsl = wsl::is_wsl();
 
         let mut app = AppImpl {
             conn,
@@ -232,11 +237,17 @@ impl AppImpl {
             entry_selection_position: 0,
             flash: None,
             event_s,
-            is_wsl: None,
+            is_wsl,
         };
 
         app.update_feeds()?;
         app.update_current_feed_and_entries()?;
+
+        // we default to having Selected::None,
+        // so if there are actually feeds, select them
+        if !app.feeds.items.is_empty() {
+            app.select_feeds()
+        }
 
         Ok(app)
     }
@@ -284,7 +295,8 @@ impl AppImpl {
     }
 
     fn update_current_feed(&mut self) -> Result<()> {
-        let current_feed = if self.feeds.items.is_empty() {
+        self.current_feed = if self.feeds.items.is_empty() {
+            self.selected = Selected::None;
             None
         } else {
             let selected_idx = match self.feeds.state.selected() {
@@ -297,8 +309,6 @@ impl AppImpl {
             let feed_id = self.feeds.items[selected_idx].id;
             Some(crate::rss::get_feed(&self.conn, feed_id)?)
         };
-
-        self.current_feed = current_feed;
 
         Ok(())
     }
@@ -505,6 +515,7 @@ impl AppImpl {
                 }
             }
             Selected::Feeds => (),
+            Selected::None => (),
         }
 
         Ok(())
@@ -540,54 +551,53 @@ impl AppImpl {
         Ok(())
     }
 
-    fn get_current_link(&self) -> String {
+    fn get_current_link(&self) -> Option<&str> {
         match &self.selected {
-            Selected::Feeds => {
-                let feed = self.current_feed.clone().unwrap();
-                feed.link.clone().unwrap_or_else(|| feed.feed_link.unwrap())
-            }
-            Selected::Entries => {
-                if let Some(entry) = self.entries.items.get(self.entry_selection_position) {
-                    entry.link.clone().unwrap_or_else(|| "".to_string())
-                } else {
-                    "".to_string()
-                }
-            }
-            Selected::Entry(e) => e.link.clone().unwrap_or_else(|| "".to_string()),
+            Selected::Feeds => self
+                .current_feed
+                .as_ref()
+                .and_then(|feed| feed.link.as_deref().or(feed.feed_link.as_deref())),
+            Selected::Entries => self
+                .entries
+                .items
+                .get(self.entry_selection_position)
+                .and_then(|entry| entry.link.as_deref()),
+            Selected::Entry(e) => e.link.as_deref(),
+            Selected::None => None,
         }
     }
 
     fn put_current_link_in_clipboard(&mut self) -> Result<()> {
         let current_link = self.get_current_link();
 
-        if self.is_wsl() {
+        if self.is_wsl {
             #[cfg(target_os = "linux")]
             {
-                util::set_wsl_clipboard_contents(&current_link)
+                if let Some(current_link) = current_link {
+                    util::set_wsl_clipboard_contents(current_link)
+                } else {
+                    Ok(())
+                }
             }
 
             #[cfg(not(target_os = "linux"))]
             {
                 unreachable!("This should never happen. This code should only be reachable if the target OS is WSL.")
             }
-        } else {
+        } else if let Some(current_link) = current_link {
             let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
-            ctx.set_contents(current_link)
+            ctx.set_contents(current_link.to_owned())
                 .map_err(|e| anyhow::anyhow!(e))
+        } else {
+            Ok(())
         }
     }
 
     fn open_link_in_browser(&self) -> Result<()> {
-        webbrowser::open(&self.get_current_link()).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    fn is_wsl(&mut self) -> bool {
-        if let Some(is_wsl) = self.is_wsl {
-            is_wsl
+        if let Some(current_link) = self.get_current_link() {
+            webbrowser::open(current_link).map_err(|e| anyhow::anyhow!(e))
         } else {
-            self.is_wsl = Some(wsl::is_wsl());
-            self.is_wsl.unwrap()
+            Ok(())
         }
     }
 
@@ -605,6 +615,7 @@ impl AppImpl {
                     Selected::Entries
                 }
             }
+            Selected::None => (),
         }
 
         Ok(())
@@ -628,6 +639,7 @@ impl AppImpl {
                     self.entry_scroll_position = n
                 };
             }
+            Selected::None => (),
         }
 
         Ok(())
@@ -645,6 +657,7 @@ impl AppImpl {
             }
             Selected::Entries => self.on_enter(),
             Selected::Entry(_) => Ok(()),
+            Selected::None => Ok(()),
         }
     }
 
@@ -666,6 +679,7 @@ impl AppImpl {
                     self.entry_scroll_position = n
                 };
             }
+            Selected::None => (),
         }
 
         Ok(())

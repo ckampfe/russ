@@ -9,6 +9,8 @@ use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::rss::EntryMeta;
 
+const PINK: Color = Color::Rgb(255, 150, 167);
+
 pub fn predraw<B: Backend>(f: &Frame<B>) -> Vec<Rect> {
     Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
@@ -26,6 +28,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Vec<Rect>, app: &mut AppImpl) 
         Selected::Entry(_entry_meta) => {
             draw_entry(f, chunks[1], app);
         }
+        Selected::None => draw_entries(f, chunks[1], app),
     }
 }
 
@@ -64,6 +67,7 @@ where
                     draw_feed_info(f, chunks[1], app);
                 }
             }
+            Selected::None => draw_first_run_helper(f, chunks[1]),
             _ => {
                 if app.current_feed.is_some() {
                     draw_feed_info(f, chunks[1], app);
@@ -85,6 +89,24 @@ where
             _ => (),
         }
     }
+}
+
+fn draw_first_run_helper<B>(f: &mut Frame<B>, area: Rect)
+where
+    B: Backend,
+{
+    let text = "Press 'i', then enter an RSS/Atom feed URL, then hit `Enter`!";
+
+    let block = Block::default().borders(Borders::ALL).title(Span::styled(
+        "TO SUBSCRIBE TO YOUR FIRST FEED",
+        Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+    ));
+
+    let paragraph = Paragraph::new(Text::from(text))
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(paragraph, area);
 }
 
 fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry_meta: &EntryMeta)
@@ -163,11 +185,7 @@ where
 
     let feeds = match app.selected {
         Selected::Feeds => feeds
-            .highlight_style(
-                Style::default()
-                    .fg(Color::Rgb(255, 150, 167))
-                    .add_modifier(Modifier::BOLD),
-            )
+            .highlight_style(Style::default().fg(PINK).add_modifier(Modifier::BOLD))
             .highlight_symbol("> "),
         _ => feeds,
     };
@@ -341,11 +359,7 @@ where
 
     let entries_titles = match app.selected {
         Selected::Entries => entries_titles
-            .highlight_style(
-                Style::default()
-                    .fg(Color::Rgb(255, 150, 167))
-                    .add_modifier(Modifier::BOLD),
-            )
+            .highlight_style(Style::default().fg(PINK).add_modifier(Modifier::BOLD))
             .highlight_symbol("> "),
         _ => entries_titles,
     };
@@ -444,7 +458,7 @@ where
     let ratio = percent as f64 / 100.0;
     let gauge = LineGauge::default()
         .block(Block::default().borders(Borders::NONE))
-        .gauge_style(Style::default().fg(Color::Rgb(255, 150, 167)))
+        .gauge_style(Style::default().fg(PINK))
         .ratio(ratio)
         .label(label);
 
