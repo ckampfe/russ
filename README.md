@@ -7,14 +7,15 @@ Russ is a TUI RSS/Atom reader with vim-like controls and an offline-first focus.
 
 ---
 
-<img src="entries.png"></img>
-<img src="entry.png"></img>
+![](entries.png)
+![](entry.png)
 
 ## install
 
-```
+```console
 $ cargo install russ --git https://github.com/ckampfe/russ
-# note that on linux, you will need these system dependencies as well, for example:
+
+  note that on linux, you will need these system dependencies as well, for example:
 $ sudo apt update && sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev
 $ russ -d"your_db_name.db"
 ```
@@ -57,7 +58,7 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 
 ## help/options/config
 
-```
+```console
 $ russ -h
 russ 0.4.0
 Clark Kampfe <clark.kampfe@gmail.com>
