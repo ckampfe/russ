@@ -11,7 +11,7 @@ anyhow = "1.0"
 atom_syndication = { version = "0.11", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "3", features = ["derive"] }
-copypasta = { git = "https://github.com/alacritty/copypasta", rev = "ecafec9" }
+copypasta = "0.8.1"
 crossterm = "0.23.2"
 diligent-date-parser = "0.1"
 html2text = "0.4"
