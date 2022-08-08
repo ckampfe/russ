@@ -28,12 +28,14 @@ pub enum Event<I> {
     Tick,
 }
 
+/// Only used to take input at the boundary.
+/// Turned into `Options` with `to_options()`.
 #[derive(Clone, Debug, Parser)]
 #[clap(author, version, about, name = "russ")]
-pub struct Options {
+struct CliOptions {
     /// feed database path
     #[clap(short, long)]
-    database_path: PathBuf,
+    database_path: Option<PathBuf>,
     /// time in ms between two ticks
     #[clap(short, long, default_value = "250")]
     tick_rate: u64,
@@ -45,9 +47,54 @@ pub struct Options {
     network_timeout: time::Duration,
 }
 
+impl CliOptions {
+    fn to_options(&self) -> std::io::Result<Options> {
+        let database_path = get_database_path(self)?;
+
+        Ok(Options {
+            database_path,
+            tick_rate: self.tick_rate,
+            flash_display_duration_seconds: self.flash_display_duration_seconds,
+            network_timeout: self.network_timeout,
+        })
+    }
+}
+
 fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
     let as_u64 = s.parse::<u64>()?;
     Ok(time::Duration::from_secs(as_u64))
+}
+
+/// internal, validated options
+#[derive(Clone, Debug)]
+pub struct Options {
+    /// feed database path
+    database_path: PathBuf,
+    /// time in ms between two ticks
+    tick_rate: u64,
+    /// number of seconds to show the flash message before clearing it
+    flash_display_duration_seconds: time::Duration,
+    /// RSS/Atom network request timeout in seconds
+    network_timeout: time::Duration,
+}
+
+fn get_database_path(cli_options: &CliOptions) -> std::io::Result<PathBuf> {
+    let database_path = if let Some(database_path) = cli_options.database_path.as_ref() {
+        database_path.to_owned()
+    } else {
+        let mut database_path = directories::ProjectDirs::from("", "", "russ")
+            .expect("unable to find home directory. if you like, you can provide a database path directly by passing the -d option.")
+            .data_local_dir()
+            .to_path_buf();
+
+        std::fs::create_dir_all(&database_path)?;
+
+        database_path.push("feeds.db");
+
+        database_path
+    };
+
+    Ok(database_path)
 }
 
 enum IoCommand {
@@ -223,7 +270,9 @@ fn clear_flash_after(sx: mpsc::Sender<IoCommand>, duration: time::Duration) {
 }
 
 fn main() -> Result<()> {
-    let options: Options = Options::parse();
+    let cli_options: CliOptions = CliOptions::parse();
+
+    let options = cli_options.to_options()?;
 
     enable_raw_mode()?;
 
