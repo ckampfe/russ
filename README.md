@@ -156,9 +156,14 @@ This is not a strict feature list, and it is not a roadmap. Unchecked items are 
 Russ targets the latest stable version of the Rust compiler. Older Rust versions may work, but building Russ against non-latest stable versions is not a project goal and is not supported.
 Likewise, Russ may build with a nightly Rust compiler, but this is not a project goal.
 
-## sqlite version
+## SQLite version
 
-Russ compiles and bundles its own embedded Sqlite via the [Rusqlite](https://github.com/rusqlite/rusqlite) project, which is version 3.38.2.
+`russ` compiles and bundles its own embedded SQLite via the [Rusqlite](https://github.com/rusqlite/rusqlite) project, which is version 3.39.2.
+
+If you prefer to use the version of SQLite on your system, edit `Cargo.toml` to
+remove the `"bundled"` feature from the `rusqlite` dependency and recompile `russ`.
+
+**Please note** that while `russ` may run just fine with whatever version of SQLite you happen to have on your system, I do not test `russ` with a system SQLite, **and running `russ` with a system SQLite is not officially supported.**
 
 ## contributing
 
