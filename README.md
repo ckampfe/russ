@@ -17,8 +17,10 @@ $ cargo install russ --git https://github.com/ckampfe/russ
 
   note that on linux, you will need these system dependencies as well, for example:
 $ sudo apt update && sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev
-$ russ -d"your_db_name.db"
+$ russ
 ```
+
+**Note** that on its first run with no arguments, `russ` creates a SQLite database file called `feeds.db` to store RSS/Atom feeds in a location of its choosing. If you wish to override this, you can pass a path with the `-d` option, like `russ -d /your/database/location/my_feeds.db`. If you use a custom database location, you will need to pass the `-d` option every time you invoke `russ`. See the help with `russ -h` for more information about where `russ` will store the `feeds.db` database by default on your platform.
 
 I do not currently publish binary releases, but that may change if someone is interested in that.
 
@@ -62,13 +64,17 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 $ russ -h
 russ 0.4.0
 Clark Kampfe <clark.kampfe@gmail.com>
+A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 
 USAGE:
-    russ [OPTIONS] --database-path <DATABASE_PATH>
+    russ [OPTIONS]
 
 OPTIONS:
     -d, --database-path <DATABASE_PATH>
-            feed database path
+            Override where `russ` stores and reads feeds. By default, the feeds database on Linux
+            this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`. On
+            MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`. On Windows it
+            will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`
 
     -f, --flash-display-duration-seconds <FLASH_DISPLAY_DURATION_SECONDS>
             number of seconds to show the flash message before clearing it [default: 4]
@@ -84,6 +90,7 @@ OPTIONS:
 
     -V, --version
             Print version information
+
 ```
 
 ## design
@@ -142,6 +149,7 @@ This is not a strict feature list, and it is not a roadmap. Unchecked items are 
 - [x] page-down/page-up entry scrolling
 - [x] automatic line length for wrapping
 - [x] ability to open the current link in your default browser
+- [x] create a feeds database by default (overridable with `-d` CLI option)
 
 ## Minimum Supported Rust Version (MSRV) policy
 

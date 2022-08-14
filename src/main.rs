@@ -28,12 +28,16 @@ pub enum Event<I> {
     Tick,
 }
 
-/// Only used to take input at the boundary.
-/// Turned into `Options` with `to_options()`.
+// Only used to take input at the boundary.
+// Turned into `Options` with `to_options()`.
+/// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 #[derive(Clone, Debug, Parser)]
 #[clap(author, version, about, name = "russ")]
 struct CliOptions {
-    /// feed database path
+    /// Override where `russ` stores and reads feeds.
+    /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
+    /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
+    /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
     #[clap(short, long)]
     database_path: Option<PathBuf>,
     /// time in ms between two ticks
