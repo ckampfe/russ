@@ -103,11 +103,24 @@ Russ is a [tui](https://crates.io/crates/tui) app that uses [crossterm](https://
 
 The application-level and database-level contracts encoded in Russ are stable. I can't remember the last time I broke one. That said, I still reserve the right to break application or database contracts to fix things, but I have no reason to believe this will happen. I use Russ every day, and it basically "just works". If you use Russ and this is not the case for you, please open an issue and let me know.
 
-## features
+## SQL
+
+Despite being a useful RSS reader for me and a few others, Russ cannot possibly provide all of
+the functionality everyone might want from an RSS reader.
+
+However, Russ uses a regular SQLite database to store RSS feeds (more detail below),
+which means that if a feature you want isn't in Russ itself, you can probably accomplish
+what you want to do with regular SQL.
+
+This is especially true for one-off tasks like running analysis of your RSS feeds,
+removing duplicates when a feed changes its link scheme, etc.
+
+If there's something you want to do with your RSS feeds and Russ doesn't do it,
+consider opening a Github issue and asking if anyone knows how to make it happen with SQL.
+
+## features/todo
 
 This is not a strict feature list, and it is not a roadmap. Unchecked items are ideas to explore rather than features that are going to be built. If you have an idea for a feature that you would enjoy, open an issue and we can talk about it.
-
-### todo
 
 - [ ] visual indicator for which feeds have new/unacknowledged entries
 - [ ] profiling mode that shows speed of UI interaction
@@ -115,9 +128,6 @@ This is not a strict feature list, and it is not a roadmap. Unchecked items are 
 - [ ] migration process for database changes
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
-
-### done
-
 - [x] rss support
 - [x] atom support
 - [x] vim-style hjkl navigation
