@@ -694,7 +694,7 @@ mod tests {
             .timeout_read(std::time::Duration::from_secs(5))
             .build();
         let feed_and_entries = fetch_feed(&http_client, ZCT).unwrap();
-        assert!(feed_and_entries.entries.len() > 0)
+        assert!(!feed_and_entries.entries.is_empty())
     }
 
     #[test]
