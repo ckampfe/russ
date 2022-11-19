@@ -32,22 +32,22 @@ pub enum Event<I> {
 // Turned into `Options` with `to_options()`.
 /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 #[derive(Clone, Debug, Parser)]
-#[clap(author, version, about, name = "russ")]
+#[command(author, version, about, name = "russ")]
 struct CliOptions {
     /// Override where `russ` stores and reads feeds.
     /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
     /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
     /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
-    #[clap(short, long)]
+    #[arg(short, long)]
     database_path: Option<PathBuf>,
     /// time in ms between two ticks
-    #[clap(short, long, default_value = "250")]
+    #[arg(short, long, default_value = "250")]
     tick_rate: u64,
     /// number of seconds to show the flash message before clearing it
-    #[clap(short, long, default_value = "4", parse(try_from_str = parse_seconds))]
+    #[arg(short, long, default_value = "4", value_parser = parse_seconds)]
     flash_display_duration_seconds: time::Duration,
     /// RSS/Atom network request timeout in seconds
-    #[clap(short, long, default_value = "5", parse(try_from_str = parse_seconds))]
+    #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
     network_timeout: time::Duration,
 }
 
