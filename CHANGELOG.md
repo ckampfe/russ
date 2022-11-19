@@ -13,6 +13,11 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 - Add Github Issue templates, thank you @NickLarsenNZ ([#8](https://github.com/ckampfe/russ/pull/8))
 - Fix first-run panics (and improve first-run experience), thank you @NickLarsenNZ for reporting ([#7](https://github.com/ckampfe/russ/issues/7))
 - README improvements, thank you @toastal ([#10](https://github.com/ckampfe/russ/pull/10))
+- Update dependencies, fixes build on android, thank you @phanirithvij ([#14](https://github.com/ckampfe/russ/pull/14))
+- Update clap to version 4
+- Remove CircleCI from build (only Github Actions now)
+- Fix a clippy warning in test
+- CI: use `apt-get` instead of `apt`
 
 ## 0.4.0
 
