@@ -8,21 +8,21 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-atom_syndication = { version = "0.11", default-features = false }
+atom_syndication = { version = "0.12", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", features = ["derive"] }
-copypasta = "0.8.1"
+copypasta = "0.8"
 crossterm = "0.26"
 diligent-date-parser = "0.1"
-directories = "4.0"
-html2text = "0.4"
-num_cpus = "1.13"
+directories = "5"
+html2text = "0.5"
+num_cpus = "1.15"
 r2d2 = "0.8"
 r2d2_sqlite = "0.21"
 rss = { version = "2.0", default-features = false }
 rusqlite = { version = "0.28", features = ["bundled", "chrono"] }
 ratatui = "0.20"
-ureq = "2.5"
+ureq = "2.6"
 webbrowser = "0.8"
 wsl = "0.1"
 
