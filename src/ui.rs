@@ -455,7 +455,7 @@ where
         0
     };
 
-    let label = format!("{}/100", percent);
+    let label = format!("{percent}/100");
     let ratio = percent as f64 / 100.0;
     let gauge = LineGauge::default()
         .block(Block::default().borders(Borders::NONE))
@@ -514,7 +514,7 @@ fn error_text(errors: &[anyhow::Error]) -> String {
     errors
         .iter()
         .flat_map(|e| {
-            let mut s = format!("{:?}", e)
+            let mut s = format!("{e:?}")
                 .split('\n')
                 .map(|s| s.to_owned())
                 .collect::<Vec<String>>();

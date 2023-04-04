@@ -42,7 +42,7 @@ impl Display for FeedKind {
             FeedKind::Rss => "RSS",
         };
 
-        write!(f, "{}", out)
+        write!(f, "{out}")
     }
 }
 
@@ -53,7 +53,7 @@ impl FromStr for FeedKind {
         match s {
             "Atom" => Ok(FeedKind::Atom),
             "RSS" => Ok(FeedKind::Rss),
-            _ => Err(anyhow::anyhow!(format!("{} is not a valid FeedKind", s))),
+            _ => Err(anyhow::anyhow!(format!("{s} is not a valid FeedKind"))),
         }
     }
 }
@@ -262,15 +262,11 @@ pub fn refresh_feed(
     conn: &mut rusqlite::Connection,
     feed_id: FeedId,
 ) -> Result<()> {
-    let feed_url = get_feed_url(conn, feed_id).with_context(|| {
-        format!(
-            "Unable to get url for feed id {} from the database",
-            feed_id
-        )
-    })?;
+    let feed_url = get_feed_url(conn, feed_id)
+        .with_context(|| format!("Unable to get url for feed id {feed_id} from the database",))?;
 
     let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)
-        .with_context(|| format!("Failed to fetch feed {}", feed_url))?;
+        .with_context(|| format!("Failed to fetch feed {feed_url}"))?;
 
     let remote_items = remote_feed.entries;
     let remote_items_links = remote_items
@@ -420,7 +416,7 @@ fn build_bulk_insert_query<C: AsRef<str>, R>(table: &str, columns: &[C], rows: &
         .map(|chunk| {
             let values_string = chunk
                 .iter()
-                .map(|i| format!("?{}", i))
+                .map(|i| format!("?{i}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             ["(", &values_string, ")"].concat()
@@ -463,7 +459,7 @@ pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
         |row| {
             let feed_kind_str: String = row.get(4)?;
             let feed_kind: FeedKind = FeedKind::from_str(&feed_kind_str)
-                .unwrap_or_else(|_| panic!("FeedKind must be Atom or RSS, got {}", feed_kind_str));
+                .unwrap_or_else(|_| panic!("FeedKind must be Atom or RSS, got {feed_kind_str}"));
 
             Ok(Feed {
                 id: row.get(0)?,

@@ -137,7 +137,7 @@ fn io_loop(
 
                 app.update_current_feed_and_entries()?;
                 let elapsed = now.elapsed();
-                app.set_flash(format!("Refreshed feed in {:?}", elapsed));
+                app.set_flash(format!("Refreshed feed in {elapsed:?}"));
                 app.force_redraw()?;
                 clear_flash_after(sx.clone(), options.flash_display_duration_seconds);
             }
@@ -162,8 +162,7 @@ fn io_loop(
 
                     let elapsed = now.elapsed();
                     app.set_flash(format!(
-                        "Refreshed {}/{} feeds in {:?}",
-                        successfully_refreshed_len, all_feeds_len, elapsed
+                        "Refreshed {successfully_refreshed_len}/{all_feeds_len} feeds in {elapsed:?}"
                     ));
                     app.force_redraw()?;
                 }
@@ -197,7 +196,7 @@ fn io_loop(
                             app.update_current_feed_and_entries()?;
 
                             let elapsed = now.elapsed();
-                            app.set_flash(format!("Subscribed in {:?}", elapsed));
+                            app.set_flash(format!("Subscribed in {elapsed:?}"));
                             app.set_mode(Mode::Normal);
                             app.force_redraw()?;
                         }
