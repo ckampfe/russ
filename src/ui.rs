@@ -1,9 +1,10 @@
-use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Text};
-use tui::widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap};
-use tui::Frame;
+use ratatui::backend::Backend;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Span, Text};
+use ratatui::widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap};
+use ratatui::Frame;
+use std::rc::Rc;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
@@ -11,14 +12,14 @@ use crate::rss::EntryMeta;
 
 const PINK: Color = Color::Rgb(255, 150, 167);
 
-pub fn predraw<B: Backend>(f: &Frame<B>) -> Vec<Rect> {
+pub fn predraw<B: Backend>(f: &Frame<B>) -> Rc<[Rect]> {
     Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .direction(Direction::Horizontal)
         .split(f.size())
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Vec<Rect>, app: &mut AppImpl) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Rc<[Rect]>, app: &mut AppImpl) {
     draw_info_column(f, chunks[0], app);
 
     match &app.selected {

@@ -3,8 +3,8 @@ use crate::util;
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use crossterm::event::{KeyCode, KeyModifiers};
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::sync::{Arc, Mutex};
-use tui::{backend::CrosstermBackend, Terminal};
 
 macro_rules! delegate_to_locked_inner {
     ($(($fn_name:ident, $t:ty)),* $(,)? ) => {

@@ -10,12 +10,12 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::{thread, time};
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
 
 mod app;
 mod modes;
