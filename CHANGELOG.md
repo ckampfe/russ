@@ -18,6 +18,9 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 - Remove CircleCI from build (only Github Actions now)
 - Fix a clippy warning in test
 - CI: use `apt-get` instead of `apt`
+- Remove the unmaintained `tui` project, and use `ratatui`, which is a maintained fork
+- Bump a few dependencies
+- Fix a few Formatting clippys
 
 ## 0.4.0
 
