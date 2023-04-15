@@ -247,7 +247,11 @@ pub fn subscribe_to_feed(
 }
 
 fn fetch_feed(http_client: &ureq::Agent, url: &str) -> Result<FeedAndEntries> {
-    let resp = http_client.get(url).call()?.into_string()?;
+    let resp = if !url.contains("http") {
+        std::fs::read_to_string(url).unwrap()
+    } else {
+        http_client.get(url).call()?.into_string()?
+    };
     let mut feed = FeedAndEntries::from_str(&resp)?;
     feed.set_feed_link(url);
 
