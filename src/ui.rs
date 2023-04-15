@@ -335,9 +335,10 @@ where
         .items
         .iter()
         .map(|entry| {
-            ListItem::new(Span::raw(entry.title.as_ref().unwrap_or_else(|| {
-                panic!("Unable to get title for entry id {}", entry.id)
-            })))
+            ListItem::new(Span::raw(entry.title.as_ref().map_or_else(
+                || std::borrow::Cow::from("No title"),
+                std::borrow::Cow::from,
+            )))
         })
         .collect::<Vec<ListItem>>();
 
