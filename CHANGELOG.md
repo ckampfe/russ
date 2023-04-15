@@ -37,7 +37,7 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 
 ## 0.3.0
 
-- `russ --version` now reports the numeric verison (e.x.: `0.3.0`) rather than a git commit hash.
+- `russ --version` now reports the numeric version (e.x.: `0.3.0`) rather than a git commit hash.
 - Bump `tui`, `crossterm`, `ureq`, and `copypasta` and some transitive dependencies
 
 ## 0.2.0

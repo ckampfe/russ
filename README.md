@@ -94,7 +94,7 @@ OPTIONS:
 
 ## design
 
-Russ stores all application data in a SQLite database. Additionally, Russ is non-eager. It will not automaticlly refresh your feeds on a timer, it will not automatically mark entries as read. Russ will only do these things when you tell it to. This is intentional, as Russ has been designed to be 100% usable offline, with no internet connection. You should be able to load it up with new feeds and entries and fly to Australia, and not have Russ complain when the plane's Wifi fails. As long as you have a copy of Russ and a SQLite database of your RSS/Atom feeds, you will be able to read your RSS/Atom feeds.
+Russ stores all application data in a SQLite database. Additionally, Russ is non-eager. It will not automatically refresh your feeds on a timer, it will not automatically mark entries as read. Russ will only do these things when you tell it to. This is intentional, as Russ has been designed to be 100% usable offline, with no internet connection. You should be able to load it up with new feeds and entries and fly to Australia, and not have Russ complain when the plane's Wifi fails. As long as you have a copy of Russ and a SQLite database of your RSS/Atom feeds, you will be able to read your RSS/Atom feeds.
 
 Russ is a [tui](https://crates.io/crates/tui) app that uses [crossterm](https://crates.io/crates/crossterm). I develop and use Russ primarily on a Mac, but I have run it successfully on Linux and WSL. It should be possible to use Russ on Windows, but I have not personally used Russ on Windows, so I cannot verify this. If you use Russ on Windows or have tried to use Russ on Windows, please open an issue and let me know!
 
