@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::rss::EntryMeta;
+use crate::rss::{EntryMeta, Feed};
 
 const PINK: Color = Color::Rgb(255, 150, 167);
 
@@ -28,6 +28,9 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Rc<[Rect]>, app: &mut AppImpl)
         }
         Selected::Entry(_entry_meta) => {
             draw_entry(f, chunks[1], app);
+        }
+        Selected::References(_) => {
+            draw_references(f, chunks[1], app);
         }
         Selected::None => draw_entries(f, chunks[1], app),
     }
@@ -287,6 +290,16 @@ where
             text.push_str("r - refresh selected feed; x - refresh all feeds\n");
             text.push_str("c - copy link; o - open link in browser\n")
         }
+        Selected::References(_) => {
+            text.push_str("c - copy link; o - open link in browser\n");
+            text.push_str("u - return to entry\n");
+        }
+        Selected::Entry(_) => {
+            text.push_str("r - mark entry read/un; a - toggle view read/un\n");
+            text.push_str("c - copy link; o - open link in browser\n");
+            text.push_str("u - list urls within entry\n")
+
+        }
         _ => {
             text.push_str("r - mark entry read/un; a - toggle view read/un\n");
             text.push_str("c - copy link; o - open link in browser\n")
@@ -391,6 +404,67 @@ where
         }
     } else {
         f.render_stateful_widget(entries_titles, area, &mut app.entries.state);
+    }
+}
+
+fn draw_references<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
+where
+    B: Backend,
+{
+    let title = match app.current_feed.as_ref() {
+        Some(Feed {
+            title: Some(title), ..
+        }) => format!("References for: {:?}", title),
+        _ => "References".to_string(),
+    };
+
+    let references = List::new(
+        app.current_entry_references
+            .items
+            .iter()
+            .map(|reference| ListItem::new(Span::raw(reference)))
+            .collect::<Vec<ListItem>>(),
+    )
+    .block(
+        Block::default().borders(Borders::ALL).title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+    );
+
+    let references = match app.selected {
+        Selected::References(_) => references
+            .highlight_style(Style::default().fg(PINK).add_modifier(Modifier::BOLD))
+            .highlight_symbol("> "),
+        _ => references,
+    };
+
+    if !&app.error_flash.is_empty() {
+        let chunks = Layout::default()
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
+            .direction(Direction::Vertical)
+            .split(area);
+        {
+            let error_text = error_text(&app.error_flash);
+
+            let block = Block::default().borders(Borders::ALL).title(Span::styled(
+                "Error - press 'q' to close",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ));
+
+            let error_widget = Paragraph::new(error_text)
+                .block(block)
+                .wrap(Wrap { trim: false })
+                .scroll((0, 0));
+
+            f.render_widget(error_widget, chunks[1]);
+        }
+    } else {
+        f.render_stateful_widget(references, area, &mut app.current_entry_references.state);
     }
 }
 

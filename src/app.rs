@@ -1,5 +1,5 @@
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::util;
+use crate::util::{self, get_referenced_urls_from_text, StatefulList};
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -64,6 +64,7 @@ impl App {
         (toggle_help, Result<()>),
         (toggle_read, Result<()>),
         (toggle_read_mode, Result<()>),
+        (find_references, Result<()>),
         (update_current_feed_and_entries, Result<()>),
     ];
 
@@ -130,6 +131,7 @@ impl App {
             }
             (KeyCode::Char('c'), _) => self.put_current_link_in_clipboard(),
             (KeyCode::Char('o'), _) => self.open_link_in_browser(),
+            (KeyCode::Char('u'), _) => self.find_references(),
             _ => Ok(()),
         }
     }
@@ -175,6 +177,8 @@ pub struct AppImpl {
     pub entries: util::StatefulList<crate::rss::EntryMeta>,
     pub entry_selection_position: usize,
     pub current_entry_text: String,
+    pub current_entry_references: util::StatefulList<String>,
+    pub references_selection_position: usize,
     pub entry_scroll_position: u16,
     pub entry_lines_len: usize,
     pub entry_lines_rendered_len: u16,
@@ -229,6 +233,8 @@ impl AppImpl {
             entry_column_width: 0,
             current_entry_meta: None,
             current_entry_text: String::new(),
+            current_entry_references: Vec::new().into(),
+            references_selection_position: 0,
             current_feed: initial_current_feed,
             feed_subscription_input: String::new(),
             mode: Mode::Normal,
@@ -454,6 +460,35 @@ impl AppImpl {
         Ok(())
     }
 
+    pub fn find_references(&mut self) -> Result<()> {
+        match &self.selected {
+            Selected::Entry(meta) => {
+                self.selected = Selected::References(meta.clone());
+                if let Some(Ok(entry)) = self.get_selected_entry() {
+                    let empty_string = String::new();
+
+                    let entry_html = entry
+                        .content
+                        .as_ref()
+                        .or(entry.description.as_ref())
+                        .or(Some(&empty_string));
+
+                    self.current_entry_references = StatefulList::with_items(
+                        get_referenced_urls_from_text(entry_html.unwrap()),
+                    );
+                } else {
+                    self.current_entry_references = StatefulList::with_items(vec![]);
+                }
+            }
+
+            Selected::References(meta) => {
+                self.selected = Selected::Entry(meta.clone());
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn clear_error_flash(&mut self) {
         self.error_flash = vec![];
     }
@@ -514,6 +549,7 @@ impl AppImpl {
                     self.update_entry_selection_position();
                 }
             }
+            Selected::References(_) => (),
             Selected::Feeds => (),
             Selected::None => (),
         }
@@ -530,10 +566,12 @@ impl AppImpl {
         match (&self.read_mode, &self.selected) {
             (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
                 self.entry_selection_position = 0;
+                self.references_selection_position = 0;
                 self.read_mode = ReadMode::ShowUnread
             }
             (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
                 self.entry_selection_position = 0;
+                self.references_selection_position = 0;
                 self.read_mode = ReadMode::ShowRead
             }
             _ => (),
@@ -562,6 +600,11 @@ impl AppImpl {
                 .items
                 .get(self.entry_selection_position)
                 .and_then(|entry| entry.link.as_deref()),
+            Selected::References(_) => self
+                .current_entry_references
+                .items
+                .get(self.references_selection_position)
+                .map(|x| x.as_str()),
             Selected::Entry(e) => e.link.as_deref(),
             Selected::None => None,
         }
@@ -615,6 +658,7 @@ impl AppImpl {
                     Selected::Entries
                 }
             }
+            Selected::References(_) => (),
             Selected::None => (),
         }
 
@@ -631,6 +675,14 @@ impl AppImpl {
                 if !self.entries.items.is_empty() {
                     self.entries.previous();
                     self.entry_selection_position = self.entries.state.selected().unwrap();
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::References(_) => {
+                if !self.current_entry_references.items.is_empty() {
+                    self.current_entry_references.previous();
+                    self.references_selection_position =
+                        self.current_entry_references.state.selected().unwrap();
                     self.update_current_entry_meta()?;
                 }
             }
@@ -657,6 +709,7 @@ impl AppImpl {
             }
             Selected::Entries => self.on_enter(),
             Selected::Entry(_) => Ok(()),
+            Selected::References(_) => Ok(()),
             Selected::None => Ok(()),
         }
     }
@@ -672,6 +725,13 @@ impl AppImpl {
                     self.entries.next();
                     self.entry_selection_position = self.entries.state.selected().unwrap();
                     self.update_current_entry_meta()?;
+                }
+            }
+            Selected::References(_) => {
+                if !self.current_entry_references.items.is_empty() {
+                    self.current_entry_references.next();
+                    self.references_selection_position =
+                        self.current_entry_references.state.selected().unwrap();
                 }
             }
             Selected::Entry(_) => {
