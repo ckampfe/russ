@@ -25,6 +25,7 @@ ratatui = "0.20"
 ureq = "2.6"
 webbrowser = "0.8"
 wsl = "0.1"
+linkify = "0.10.0"
 
 [profile.release]
 codegen-units = 1

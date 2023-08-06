@@ -1,4 +1,6 @@
+use linkify::{LinkFinder, LinkKind};
 use ratatui::widgets::ListState;
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct StatefulList<T> {
@@ -55,6 +57,21 @@ impl<T> From<Vec<T>> for StatefulList<T> {
     fn from(other: Vec<T>) -> Self {
         StatefulList::with_items(other)
     }
+}
+
+pub static LINK_FINDER: OnceLock<LinkFinder> = OnceLock::new();
+
+pub(crate) fn get_referenced_urls_from_text(text: &str) -> Vec<String> {
+    let finder = LINK_FINDER.get_or_init(|| {
+        let mut lf = LinkFinder::new();
+        lf.kinds(&[LinkKind::Url]);
+        lf
+    });
+
+    finder
+        .links(text)
+        .map(|link| link.as_str().to_string())
+        .collect()
 }
 
 #[cfg(target_os = "linux")]

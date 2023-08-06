@@ -48,8 +48,9 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 - `x` - refresh all feeds
 - `i` - change to insert mode
 - `a` - toggle between read/unread entries
-- `c` - copy the selected link to the clipboard (feed or entry)
-- `o` - open the selected link in your browser (feed or entry)
+- `c` - copy the selected link to the clipboard (feed or entry or references)
+- `o` - open the selected link in your browser (feed or entry or references)
+- `u` - find referenced/cited urls within current entry
 
 ### controls - insert mode
 

@@ -3,6 +3,7 @@ pub enum Selected {
     Feeds,
     Entries,
     Entry(crate::rss::EntryMeta),
+    References(crate::rss::EntryMeta),
     None,
 }
 
