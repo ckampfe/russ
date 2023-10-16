@@ -1,16 +1,21 @@
+use std::rc::Rc;
+
+use chrono::{self, DateTime};
 use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Span, Text};
 use ratatui::widgets::{Block, Borders, LineGauge, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
-use std::rc::Rc;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::rss::EntryMeta;
 
 const PINK: Color = Color::Rgb(255, 150, 167);
+
+/// Date format used that is YY-MM-DD HH:MM:SS.
+const DATETIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 pub fn predraw<B: Backend>(f: &Frame<B>) -> Rc<[Rect]> {
     Layout::default()
@@ -241,7 +246,7 @@ where
         .current_feed
         .as_ref()
         .and_then(|feed| feed.refreshed_at)
-        .map(|timestamp| timestamp.to_string())
+        .map(|timestamp| format_time(&timestamp))
         .or_else(|| Some("Never refreshed".to_string()))
     {
         text.push_str("Refreshed at: ");
@@ -509,6 +514,11 @@ where
         f.render_widget(paragraph, chunks[0]);
         f.render_widget(gauge, chunks[1]);
     }
+}
+
+/// Format the given time in local timezone with seconds precision.
+fn format_time<Tz: chrono::TimeZone>(t: &DateTime<Tz>) -> String {
+    t.with_timezone(&chrono::Local).format(DATETIME_FORMAT).to_string()
 }
 
 fn error_text(errors: &[anyhow::Error]) -> String {
