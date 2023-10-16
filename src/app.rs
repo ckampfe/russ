@@ -172,7 +172,7 @@ pub struct AppImpl {
     pub feeds: util::StatefulList<crate::rss::Feed>,
     // entry stuff
     pub current_entry_meta: Option<crate::rss::EntryMeta>,
-    pub entries: util::StatefulList<crate::rss::EntryMeta>,
+    pub current_entries: util::StatefulList<crate::rss::EntryMeta>,
     pub entry_selection_position: usize,
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
@@ -221,7 +221,7 @@ impl AppImpl {
             should_quit: false,
             error_flash: vec![],
             feeds,
-            entries,
+            current_entries: entries,
             selected,
             entry_scroll_position: 0,
             entry_lines_len: 0,
@@ -273,7 +273,7 @@ impl AppImpl {
             }
 
             // Remove the entries from the feed in app state
-            self.entries.items.retain(|entry| entry.feed_id != feed_id);
+            self.current_entries.items.retain(|entry| entry.feed_id != feed_id);
 
             // Update
             self.update_current_feed_and_entries()?;
@@ -323,32 +323,32 @@ impl AppImpl {
             vec![].into()
         };
 
-        self.entries = entries;
+        self.current_entries = entries;
 
-        if self.entry_selection_position < self.entries.items.len() {
-            self.entries
+        if self.entry_selection_position < self.current_entries.items.len() {
+            self.current_entries
                 .state
                 .select(Some(self.entry_selection_position))
         } else {
-            match self.entries.items.len().checked_sub(1) {
-                Some(n) => self.entries.state.select(Some(n)),
-                None => self.entries.reset(),
+            match self.current_entries.items.len().checked_sub(1) {
+                Some(n) => self.current_entries.state.select(Some(n)),
+                None => self.current_entries.reset(),
             }
         }
         Ok(())
     }
 
     fn update_entry_selection_position(&mut self) {
-        if self.entries.items.is_empty() {
+        if self.current_entries.items.is_empty() {
             self.entry_selection_position = 0
-        } else if self.entry_selection_position > self.entries.items.len() - 1 {
-            self.entry_selection_position = self.entries.items.len() - 1
+        } else if self.entry_selection_position > self.current_entries.items.len() - 1 {
+            self.entry_selection_position = self.current_entries.items.len() - 1
         };
     }
 
     fn get_selected_entry(&self) -> Option<Result<crate::rss::EntryContent>> {
-        self.entries.state.selected().and_then(|selected_idx| {
-            self.entries
+        self.current_entries.state.selected().and_then(|selected_idx| {
+            self.current_entries
                 .items
                 .get(selected_idx)
                 .map(|item| item.id)
@@ -357,8 +357,8 @@ impl AppImpl {
     }
 
     fn get_selected_entry_meta(&self) -> Option<Result<crate::rss::EntryMeta>> {
-        self.entries.state.selected().and_then(|selected_idx| {
-            self.entries
+        self.current_entries.state.selected().and_then(|selected_idx| {
+            self.current_entries
                 .items
                 .get(selected_idx)
                 .map(|item| item.id)
@@ -403,7 +403,7 @@ impl AppImpl {
     pub fn on_enter(&mut self) -> Result<()> {
         match self.selected {
             Selected::Entries | Selected::Entry(_) => {
-                if !self.entries.items.is_empty() {
+                if !self.current_entries.items.is_empty() {
                     if let Some(entry_meta) = &self.current_entry_meta {
                         if let Some(entry) = self.get_selected_entry() {
                             let entry = entry?;
@@ -540,10 +540,10 @@ impl AppImpl {
         }
         self.update_current_entries()?;
 
-        if !self.entries.items.is_empty() {
-            self.entries.reset();
+        if !self.current_entries.items.is_empty() {
+            self.current_entries.reset();
         } else {
-            self.entries.unselect();
+            self.current_entries.unselect();
         }
 
         self.update_current_entry_meta()?;
@@ -558,7 +558,7 @@ impl AppImpl {
                 .as_ref()
                 .and_then(|feed| feed.link.as_deref().or(feed.feed_link.as_deref())),
             Selected::Entries => self
-                .entries
+                .current_entries
                 .items
                 .get(self.entry_selection_position)
                 .and_then(|entry| entry.link.as_deref()),
@@ -628,9 +628,9 @@ impl AppImpl {
                 self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
-                if !self.entries.items.is_empty() {
-                    self.entries.previous();
-                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                if !self.current_entries.items.is_empty() {
+                    self.current_entries.previous();
+                    self.entry_selection_position = self.current_entries.state.selected().unwrap();
                     self.update_current_entry_meta()?;
                 }
             }
@@ -648,9 +648,9 @@ impl AppImpl {
     pub fn on_right(&mut self) -> Result<()> {
         match self.selected {
             Selected::Feeds => {
-                if !self.entries.items.is_empty() {
+                if !self.current_entries.items.is_empty() {
                     self.selected = Selected::Entries;
-                    self.entries.reset();
+                    self.current_entries.reset();
                     self.update_current_entry_meta()?;
                 }
                 Ok(())
@@ -668,9 +668,9 @@ impl AppImpl {
                 self.update_current_feed_and_entries()?;
             }
             Selected::Entries => {
-                if !self.entries.items.is_empty() {
-                    self.entries.next();
-                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                if !self.current_entries.items.is_empty() {
+                    self.current_entries.next();
+                    self.entry_selection_position = self.current_entries.state.selected().unwrap();
                     self.update_current_entry_meta()?;
                 }
             }

@@ -229,7 +229,7 @@ where
         text.push('\n');
     }
 
-    if let Some(item) = app.entries.items.get(0) {
+    if let Some(item) = app.current_entries.items.get(0) {
         if let Some(pub_date) = &item.pub_date {
             text.push_str("Most recent entry at: ");
             text.push_str(pub_date.to_string().as_str());
@@ -254,7 +254,7 @@ where
         ReadMode::ShowRead => text.push_str("Read entries: "),
         ReadMode::All => unreachable!("ReadMode::All should never be possible from the UI!"),
     }
-    text.push_str(app.entries.items.len().to_string().as_str());
+    text.push_str(app.current_entries.items.len().to_string().as_str());
     text.push('\n');
 
     if let Some(feed_kind) = app.current_feed.as_ref().map(|feed| feed.feed_kind) {
@@ -331,7 +331,7 @@ where
     B: Backend,
 {
     let entries = app
-        .entries
+        .current_entries
         .items
         .iter()
         .map(|entry| {
@@ -386,11 +386,11 @@ where
                 .wrap(Wrap { trim: false })
                 .scroll((0, 0));
 
-            f.render_stateful_widget(entries_titles, chunks[0], &mut app.entries.state);
+            f.render_stateful_widget(entries_titles, chunks[0], &mut app.current_entries.state);
             f.render_widget(error_widget, chunks[1]);
         }
     } else {
-        f.render_stateful_widget(entries_titles, area, &mut app.entries.state);
+        f.render_stateful_widget(entries_titles, area, &mut app.current_entries.state);
     }
 }
 
