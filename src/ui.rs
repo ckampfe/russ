@@ -342,13 +342,19 @@ where
         })
         .collect::<Vec<ListItem>>();
 
-    let default_title = "Entries".to_string();
-
-    let title = app
+    let default_feed_title = "Entries".to_string();
+    let feed_title = app
         .current_feed
         .as_ref()
         .and_then(|feed| feed.title.as_ref())
-        .unwrap_or(&default_title);
+        .unwrap_or(&default_feed_title);
+
+    let read_mode_suff = match app.read_mode {
+        ReadMode::All => " (all)",
+        ReadMode::ShowRead => " (read)",
+        ReadMode::ShowUnread => " (unread)",
+    };
+    let title = format!("{}{}", feed_title, read_mode_suff);
 
     let entries_titles = List::new(entries).block(
         Block::default().borders(Borders::ALL).title(Span::styled(
