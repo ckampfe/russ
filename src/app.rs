@@ -173,7 +173,7 @@ pub struct AppImpl {
     // entry stuff
     pub current_entry_meta: Option<crate::rss::EntryMeta>,
     pub current_entries: util::StatefulList<crate::rss::EntryMeta>,
-    pub entry_selection_position: usize,
+    pub current_entry_selection_position: usize,
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
     pub entry_lines_len: usize,
@@ -234,7 +234,7 @@ impl AppImpl {
             mode: Mode::Normal,
             read_mode: ReadMode::ShowUnread,
             show_help: true,
-            entry_selection_position: 0,
+            current_entry_selection_position: 0,
             flash: None,
             event_s,
             is_wsl,
@@ -325,10 +325,10 @@ impl AppImpl {
 
         self.current_entries = entries;
 
-        if self.entry_selection_position < self.current_entries.items.len() {
+        if self.current_entry_selection_position < self.current_entries.items.len() {
             self.current_entries
                 .state
-                .select(Some(self.entry_selection_position))
+                .select(Some(self.current_entry_selection_position))
         } else {
             match self.current_entries.items.len().checked_sub(1) {
                 Some(n) => self.current_entries.state.select(Some(n)),
@@ -340,9 +340,9 @@ impl AppImpl {
 
     fn update_entry_selection_position(&mut self) {
         if self.current_entries.items.is_empty() {
-            self.entry_selection_position = 0
-        } else if self.entry_selection_position > self.current_entries.items.len() - 1 {
-            self.entry_selection_position = self.current_entries.items.len() - 1
+            self.current_entry_selection_position = 0
+        } else if self.current_entry_selection_position > self.current_entries.items.len() - 1 {
+            self.current_entry_selection_position = self.current_entries.items.len() - 1
         };
     }
 
@@ -529,11 +529,11 @@ impl AppImpl {
     pub fn toggle_read_mode(&mut self) -> Result<()> {
         match (&self.read_mode, &self.selected) {
             (ReadMode::ShowRead, Selected::Feeds) | (ReadMode::ShowRead, Selected::Entries) => {
-                self.entry_selection_position = 0;
+                self.current_entry_selection_position = 0;
                 self.read_mode = ReadMode::ShowUnread
             }
             (ReadMode::ShowUnread, Selected::Feeds) | (ReadMode::ShowUnread, Selected::Entries) => {
-                self.entry_selection_position = 0;
+                self.current_entry_selection_position = 0;
                 self.read_mode = ReadMode::ShowRead
             }
             _ => (),
@@ -560,7 +560,7 @@ impl AppImpl {
             Selected::Entries => self
                 .current_entries
                 .items
-                .get(self.entry_selection_position)
+                .get(self.current_entry_selection_position)
                 .and_then(|entry| entry.link.as_deref()),
             Selected::Entry(e) => e.link.as_deref(),
             Selected::None => None,
@@ -605,7 +605,7 @@ impl AppImpl {
         match self.selected {
             Selected::Feeds => (),
             Selected::Entries => {
-                self.entry_selection_position = 0;
+                self.current_entry_selection_position = 0;
                 self.selected = Selected::Feeds
             }
             Selected::Entry(_) => {
@@ -630,7 +630,7 @@ impl AppImpl {
             Selected::Entries => {
                 if !self.current_entries.items.is_empty() {
                     self.current_entries.previous();
-                    self.entry_selection_position = self.current_entries.state.selected().unwrap();
+                    self.current_entry_selection_position = self.current_entries.state.selected().unwrap();
                     self.update_current_entry_meta()?;
                 }
             }
@@ -670,7 +670,7 @@ impl AppImpl {
             Selected::Entries => {
                 if !self.current_entries.items.is_empty() {
                     self.current_entries.next();
-                    self.entry_selection_position = self.current_entries.state.selected().unwrap();
+                    self.current_entry_selection_position = self.current_entries.state.selected().unwrap();
                     self.update_current_entry_meta()?;
                 }
             }
