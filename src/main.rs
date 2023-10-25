@@ -5,7 +5,7 @@ use anyhow::Result;
 use app::App;
 use clap::Parser;
 use crossterm::event;
-use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
+use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -337,7 +337,7 @@ fn main() -> Result<()> {
 
         match mode {
             Mode::Normal => match rx.recv()? {
-                Event::Input(event) => match (event.code, event.modifiers) {
+                Event::Input(event) if event.kind == KeyEventKind::Press => match (event.code, event.modifiers) {
                     // These first few keycodes are handled inline
                     // because they talk to either the IO thread or the terminal.
                     // All other keycodes are handled in the final `on_key`
@@ -377,10 +377,11 @@ fn main() -> Result<()> {
                         }
                     }
                 },
+                Event::Input(_) => (),
                 Event::Tick => (),
             },
             Mode::Editing => match rx.recv()? {
-                Event::Input(event) => match event.code {
+                Event::Input(event) if event.kind == KeyEventKind::Press => match event.code {
                     KeyCode::Enter => {
                         let feed_subscription_input = { app.feed_subscription_input() };
                         io_s.send(IoCommand::SubscribeToFeed(feed_subscription_input))?;
@@ -397,6 +398,7 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
+                Event::Input(_) => (),
                 Event::Tick => (),
             },
         }
