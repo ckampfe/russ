@@ -61,34 +61,23 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 
 ```console
 $ russ -h
-russ 0.4.0
-Clark Kampfe <clark.kampfe@gmail.com>
 A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 
-USAGE:
-    russ [OPTIONS]
+Usage: russ [OPTIONS]
 
-OPTIONS:
-    -d, --database-path <DATABASE_PATH>
-            Override where `russ` stores and reads feeds. By default, the feeds database on Linux
-            this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`. On
-            MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`. On Windows it
-            will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`
-
-    -f, --flash-display-duration-seconds <FLASH_DISPLAY_DURATION_SECONDS>
-            number of seconds to show the flash message before clearing it [default: 4]
-
-    -h, --help
-            Print help information
-
-    -n, --network-timeout <NETWORK_TIMEOUT>
-            RSS/Atom network request timeout in seconds [default: 5]
-
-    -t, --tick-rate <TICK_RATE>
-            time in ms between two ticks [default: 250]
-
-    -V, --version
-            Print version information
+Options:
+  -d, --database-path <DATABASE_PATH>
+          Override where `russ` stores and reads feeds. By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`. On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`. On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`
+  -t, --tick-rate <TICK_RATE>
+          time in ms between two ticks [default: 250]
+  -f, --flash-display-duration-seconds <FLASH_DISPLAY_DURATION_SECONDS>
+          number of seconds to show the flash message before clearing it [default: 4]
+  -n, --network-timeout <NETWORK_TIMEOUT>
+          RSS/Atom network request timeout in seconds [default: 5]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 
 ```
 
