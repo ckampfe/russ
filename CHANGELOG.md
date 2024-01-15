@@ -9,7 +9,6 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 - Remove `tokio` and `futures-util`.
 - Group operations that mutate the database into meaningful transactions
 - Tidy up the [README](README.md)
-- Bump `html2text` to `0.4`
 - Add Github Issue templates, thank you @NickLarsenNZ ([#8](https://github.com/ckampfe/russ/pull/8))
 - Fix first-run panics (and improve first-run experience), thank you @NickLarsenNZ for reporting ([#7](https://github.com/ckampfe/russ/issues/7))
 - README improvements, thank you @toastal ([#10](https://github.com/ckampfe/russ/pull/10))
@@ -19,8 +18,17 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 - Fix a clippy warning in test
 - CI: use `apt-get` instead of `apt`
 - Remove the unmaintained `tui` project, and use `ratatui`, which is a maintained fork
-- Bump a few dependencies
 - Fix a few Formatting clippys
+- When refreshing a feed, Russ now attempts to use the `If-None-Match` header to check if the server actually has a newer version of the feed, and avoids downloading the feed if it is not newer. This should cut down on quite a bit of network traffic and make Russ a better citizen with regard to hammering sites' feeds.
+- Bump `copypasta` to 0.10
+- Bump `crossterm` to 0.27
+- Bump `html2text` to 0.11
+- Bump `num_cpus` to 1.16
+- Bump `r2d2_sqlite` to 0.23
+- Bump `rusqlite` to 0.30
+- Bump `ratatui` to 0.25
+- Bump `ureq` to 2.9
+- Bump lots of transitive dependencies
 
 ## 0.4.0
 

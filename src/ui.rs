@@ -1,4 +1,3 @@
-use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Span, Text};
@@ -12,14 +11,14 @@ use crate::rss::EntryMeta;
 
 const PINK: Color = Color::Rgb(255, 150, 167);
 
-pub fn predraw<B: Backend>(f: &Frame<B>) -> Rc<[Rect]> {
+pub fn predraw(f: &Frame) -> Rc<[Rect]> {
     Layout::default()
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .direction(Direction::Horizontal)
         .split(f.size())
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Rc<[Rect]>, app: &mut AppImpl) {
+pub fn draw(f: &mut Frame, chunks: Rc<[Rect]>, app: &mut AppImpl) {
     draw_info_column(f, chunks[0], app);
 
     match &app.selected {
@@ -33,10 +32,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, chunks: Rc<[Rect]>, app: &mut AppImpl)
     }
 }
 
-fn draw_info_column<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_info_column(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let mut constraints = match &app.mode {
         Mode::Normal => vec![Constraint::Percentage(70), Constraint::Percentage(20)],
         Mode::Editing => vec![
@@ -92,10 +88,7 @@ where
     }
 }
 
-fn draw_first_run_helper<B>(f: &mut Frame<B>, area: Rect)
-where
-    B: Backend,
-{
+fn draw_first_run_helper(f: &mut Frame, area: Rect) {
     let text = "Press 'i', then enter an RSS/Atom feed URL, then hit `Enter`!";
 
     let block = Block::default().borders(Borders::ALL).title(Span::styled(
@@ -110,10 +103,7 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_entry_info<B>(f: &mut Frame<B>, area: Rect, entry_meta: &EntryMeta)
-where
-    B: Backend,
-{
+fn draw_entry_info(f: &mut Frame, area: Rect, entry_meta: &EntryMeta) {
     let mut text = String::new();
     if let Some(item) = &entry_meta.title {
         text.push_str("Title: ");
@@ -159,10 +149,7 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_feeds<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_feeds(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let feeds = app
         .feeds
         .items
@@ -194,10 +181,7 @@ where
     f.render_stateful_widget(feeds, area, &mut app.feeds.state);
 }
 
-fn draw_feed_info<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_feed_info(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let mut text = String::new();
     if let Some(item) = app
         .current_feed
@@ -229,7 +213,7 @@ where
         text.push('\n');
     }
 
-    if let Some(item) = app.entries.items.get(0) {
+    if let Some(item) = app.entries.items.first() {
         if let Some(pub_date) = &item.pub_date {
             text.push_str("Most recent entry at: ");
             text.push_str(pub_date.to_string().as_str());
@@ -277,10 +261,7 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_help<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_help(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let mut text = String::new();
     match app.selected {
         Selected::Feeds => {
@@ -307,10 +288,7 @@ where
     f.render_widget(help_message, area);
 }
 
-fn draw_new_feed_input<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_new_feed_input(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let text = &app.feed_subscription_input;
     let text = Text::from(text.as_str());
     let input = Paragraph::new(text)
@@ -326,10 +304,7 @@ where
     f.render_widget(input, area);
 }
 
-fn draw_entries<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_entries(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let entries = app
         .entries
         .items
@@ -394,10 +369,7 @@ where
     }
 }
 
-fn draw_entry<B>(f: &mut Frame<B>, area: Rect, app: &mut AppImpl)
-where
-    B: Backend,
-{
+fn draw_entry(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let scroll = app.entry_scroll_position;
     let entry_meta = if let Selected::Entry(e) = &app.selected {
         e

@@ -1,5 +1,5 @@
 use crate::modes::ReadMode;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
@@ -68,6 +68,7 @@ pub struct Feed {
     pub refreshed_at: Option<chrono::DateTime<Utc>>,
     pub inserted_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
+    pub latest_etag: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -91,11 +92,11 @@ impl From<&atom::Entry> for Entry {
             id: -1,
             feed_id: -1,
             title: Some(entry.title().to_string()),
-            author: entry.authors().get(0).map(|author| author.name.to_owned()),
+            author: entry.authors().first().map(|author| author.name.to_owned()),
             pub_date: entry.published().map(|date| date.with_timezone(&Utc)),
             description: None,
             content: entry.content().and_then(|content| content.value.to_owned()),
-            link: entry.links().get(0).map(|link| link.href().to_string()),
+            link: entry.links().first().map(|link| link.href().to_string()),
             read_at: None,
             inserted_at: Utc::now(),
             updated_at: Utc::now(),
@@ -173,8 +174,12 @@ struct FeedAndEntries {
 }
 
 impl FeedAndEntries {
-    pub fn set_feed_link(&mut self, url: &str) {
+    fn set_feed_link(&mut self, url: &str) {
         self.feed.feed_link = Some(url.to_owned());
+    }
+
+    fn set_latest_etag(&mut self, etag: Option<String>) {
+        self.feed.latest_etag = etag;
     }
 }
 
@@ -188,11 +193,12 @@ impl FromStr for FeedAndEntries {
                     id: 0,
                     title: Some(atom_feed.title.to_string()),
                     feed_link: None,
-                    link: atom_feed.links.get(0).map(|link| link.href().to_string()),
+                    link: atom_feed.links.first().map(|link| link.href().to_string()),
                     feed_kind: FeedKind::Atom,
                     refreshed_at: None,
                     inserted_at: Utc::now(),
                     updated_at: Utc::now(),
+                    latest_etag: None,
                 };
 
                 let entries = atom_feed
@@ -215,6 +221,7 @@ impl FromStr for FeedAndEntries {
                         refreshed_at: None,
                         inserted_at: Utc::now(),
                         updated_at: Utc::now(),
+                        latest_etag: None,
                     };
 
                     let entries = channel
@@ -236,22 +243,78 @@ pub fn subscribe_to_feed(
     conn: &mut rusqlite::Connection,
     url: &str,
 ) -> Result<FeedId> {
-    let feed_and_entries: FeedAndEntries = fetch_feed(http_client, url)?;
-    let feed_id = in_transaction(conn, |tx| {
-        let feed_id = create_feed(tx, &feed_and_entries.feed)?;
-        add_entries_to_feed(tx, feed_id, &feed_and_entries.entries)?;
-        Ok(feed_id)
-    })?;
+    let feed_and_entries = fetch_feed(http_client, url, None)?;
 
-    Ok(feed_id)
+    match feed_and_entries {
+        FeedResponse::CacheMiss(feed_and_entries) => {
+            let feed_id = in_transaction(conn, |tx| {
+                let feed_id = create_feed(tx, &feed_and_entries.feed)?;
+                add_entries_to_feed(tx, feed_id, &feed_and_entries.entries)?;
+                Ok(feed_id)
+            })?;
+
+            Ok(feed_id)
+        }
+        FeedResponse::CacheHit => {
+            bail!("Did not expect feed to be cached in this instance as we did not pass an etag")
+        }
+    }
 }
 
-fn fetch_feed(http_client: &ureq::Agent, url: &str) -> Result<FeedAndEntries> {
-    let resp = http_client.get(url).call()?.into_string()?;
-    let mut feed = FeedAndEntries::from_str(&resp)?;
-    feed.set_feed_link(url);
+enum FeedResponse {
+    /// The remote host returned a new feed.
+    /// The data may not actually be new, as hosts
+    /// seem to change etags for all kinds of reasons
+    CacheMiss(FeedAndEntries),
+    /// the remote host indicated a cache hit,
+    /// and did not return any new data
+    CacheHit,
+}
 
-    Ok(feed)
+fn fetch_feed(
+    http_client: &ureq::Agent,
+    url: &str,
+    current_etag: Option<String>,
+) -> Result<FeedResponse> {
+    let request = http_client.get(url);
+
+    let request = if let Some(etag) = current_etag {
+        request.set("If-None-Match", &etag)
+    } else {
+        request
+    };
+
+    let response = request.call()?;
+
+    match response.status() {
+        // the etags did not match, it is a new feed file
+        200 => {
+            let header_names = response.headers_names();
+
+            let etag_header_name = header_names
+                .iter()
+                .find(|header_name| header_name.to_lowercase() == "etag");
+
+            let etag = etag_header_name
+                .and_then(|etag_header| response.header(etag_header))
+                .map(|etag| etag.to_owned());
+
+            let content = response.into_string()?;
+
+            let mut feed = FeedAndEntries::from_str(&content)?;
+
+            feed.set_latest_etag(etag);
+
+            feed.set_feed_link(url);
+
+            Ok(FeedResponse::CacheMiss(feed))
+        }
+        // the etags match, it is the same feed we already have
+        304 => Ok(FeedResponse::CacheHit),
+        _ => Err(anyhow::anyhow!(
+            "received unexpected status code fetching feed {response:?}"
+        )),
+    }
 }
 
 /// fetches the feed and stores the new entries
@@ -265,47 +328,61 @@ pub fn refresh_feed(
     let feed_url = get_feed_url(conn, feed_id)
         .with_context(|| format!("Unable to get url for feed id {feed_id} from the database",))?;
 
-    let remote_feed: FeedAndEntries = fetch_feed(client, &feed_url)
+    let current_etag = get_feed_latest_etag(conn, feed_id).with_context(|| {
+        format!("Unable to get latest_etag for feed_id {feed_id} from the database")
+    })?;
+
+    let remote_feed = fetch_feed(client, &feed_url, current_etag)
         .with_context(|| format!("Failed to fetch feed {feed_url}"))?;
 
-    let remote_items = remote_feed.entries;
-    let remote_items_links = remote_items
-        .iter()
-        .flat_map(|item| &item.link)
-        .cloned()
-        .collect::<HashSet<String>>();
+    if let FeedResponse::CacheMiss(remote_feed) = remote_feed {
+        let remote_items = remote_feed.entries;
+        let remote_items_links = remote_items
+            .iter()
+            .flat_map(|item| &item.link)
+            .cloned()
+            .collect::<HashSet<String>>();
 
-    let local_entries_links = get_entries_links(conn, &ReadMode::All, feed_id)?
-        .into_iter()
-        .flatten()
-        .collect::<HashSet<_>>();
+        let local_entries_links = get_entries_links(conn, &ReadMode::All, feed_id)?
+            .into_iter()
+            .flatten()
+            .collect::<HashSet<_>>();
 
-    let difference = remote_items_links
-        .difference(&local_entries_links)
-        .cloned()
-        .collect::<HashSet<_>>();
+        let difference = remote_items_links
+            .difference(&local_entries_links)
+            .cloned()
+            .collect::<HashSet<_>>();
 
-    let items_to_add = remote_items
-        .into_iter()
-        .filter(|item| match &item.link {
-            Some(link) => difference.contains(link.as_str()),
-            None => false,
-        })
-        .collect::<Vec<_>>();
+        let items_to_add = remote_items
+            .into_iter()
+            .filter(|item| match &item.link {
+                Some(link) => difference.contains(link.as_str()),
+                None => false,
+            })
+            .collect::<Vec<_>>();
 
-    in_transaction(conn, |tx| {
-        add_entries_to_feed(tx, feed_id, &items_to_add)?;
-        update_feed_refreshed_at(tx, feed_id)?;
-        Ok(())
-    })?;
+        in_transaction(conn, |tx| {
+            add_entries_to_feed(tx, feed_id, &items_to_add)?;
+            update_feed_refreshed_at(tx, feed_id)?;
+            update_feed_etag(tx, feed_id, remote_feed.feed.latest_etag.clone())?;
+            Ok(())
+        })?;
+    } else {
+        in_transaction(conn, |tx| update_feed_refreshed_at(tx, feed_id))?;
+    }
 
     Ok(())
 }
 
 pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
     in_transaction(conn, |tx| {
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS feeds (
+        let schema_version: u64 = tx.pragma_query_value(None, "user_version", |row| row.get(0))?;
+
+        if schema_version == 0 {
+            tx.pragma_update(None, "user_version", 1)?;
+
+            tx.execute(
+                "CREATE TABLE IF NOT EXISTS feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
         feed_link TEXT,
@@ -315,11 +392,11 @@ pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
-            [],
-        )?;
+                [],
+            )?;
 
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS entries (
+            tx.execute(
+                "CREATE TABLE IF NOT EXISTS entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         feed_id INTEGER,
         title TEXT,
@@ -332,14 +409,21 @@ pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
-            [],
-        )?;
+                [],
+            )?;
 
-        tx.execute(
-            "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index
+            tx.execute(
+                "CREATE INDEX IF NOT EXISTS entries_feed_id_and_pub_date_and_inserted_at_index
         ON entries (feed_id, pub_date, inserted_at)",
-            [],
-        )?;
+                [],
+            )?;
+        }
+
+        if schema_version <= 1 {
+            tx.pragma_update(None, "user_version", 2)?;
+
+            tx.execute("ALTER TABLE feeds ADD COLUMN latest_etag TEXT", [])?;
+        }
 
         Ok(())
     })
@@ -454,7 +538,7 @@ fn build_bulk_insert_query<C: AsRef<str>, R>(table: &str, columns: &[C], rows: &
 
 pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
     let s = conn.query_row(
-        "SELECT id, title, feed_link, link, feed_kind, refreshed_at, inserted_at, updated_at FROM feeds WHERE id=?1",
+        "SELECT id, title, feed_link, link, feed_kind, refreshed_at, inserted_at, updated_at, latest_etag FROM feeds WHERE id=?1",
         [feed_id],
         |row| {
             let feed_kind_str: String = row.get(4)?;
@@ -470,6 +554,7 @@ pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
                 refreshed_at: row.get(5)?,
                 inserted_at: row.get(6)?,
                 updated_at: row.get(7)?,
+                latest_etag: row.get(8)?,
             })
         },
     )?;
@@ -486,11 +571,37 @@ fn update_feed_refreshed_at(tx: &rusqlite::Transaction, feed_id: FeedId) -> Resu
     Ok(())
 }
 
+fn update_feed_etag(
+    tx: &rusqlite::Transaction,
+    feed_id: FeedId,
+    latest_etag: Option<String>,
+) -> Result<()> {
+    tx.execute(
+        "UPDATE feeds SET latest_etag = ?2 WHERE id = ?1",
+        params![feed_id, latest_etag],
+    )?;
+
+    Ok(())
+}
+
 pub fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<String> {
     let s: String = conn.query_row(
         "SELECT feed_link FROM feeds WHERE id=?1",
         [feed_id],
         |row| row.get(0),
+    )?;
+
+    Ok(s)
+}
+
+fn get_feed_latest_etag(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Option<String>> {
+    let s: Option<String> = conn.query_row(
+        "SELECT latest_etag FROM feeds WHERE id=?1",
+        [feed_id],
+        |row| {
+            let etag: Option<String> = row.get(0)?;
+            Ok(etag)
+        },
     )?;
 
     Ok(s)
@@ -506,7 +617,8 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
           feed_kind, 
           refreshed_at, 
           inserted_at, 
-          updated_at 
+          updated_at,
+          latest_etag
         FROM feeds ORDER BY lower(title) ASC",
     )?;
     let mut feeds = vec![];
@@ -520,6 +632,7 @@ pub fn get_feeds(conn: &rusqlite::Connection) -> Result<Vec<Feed>> {
             refreshed_at: row.get(5)?,
             inserted_at: row.get(6)?,
             updated_at: row.get(7)?,
+            latest_etag: row.get(8)?,
         })
     })? {
         feeds.push(feed?)
@@ -689,8 +802,12 @@ mod tests {
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(5))
             .build();
-        let feed_and_entries = fetch_feed(&http_client, ZCT).unwrap();
-        assert!(!feed_and_entries.entries.is_empty())
+        let feed_and_entries = fetch_feed(&http_client, ZCT, None).unwrap();
+        if let FeedResponse::CacheMiss(feed_and_entries) = feed_and_entries {
+            assert!(!feed_and_entries.entries.is_empty())
+        } else {
+            panic!("somehow got a cached response when passing no etag")
+        }
     }
 
     #[test]
