@@ -4,6 +4,8 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 
 ## Unreleased
 
+## 0.5.0
+
 - Russ now creates a feeds database by default. It will be at`$XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db` on Linux, and `$HOME/Library/Application Support/russ/feeds.db` on Mac. See the [directories](https://github.com/dirs-dev/directories-rs#projectdirs) docs for more information on how this location is computed. Note that this is a non-breaking change and the `-d` CLI flag will continue to override the default database path, so you can continue to use a different path if you want.
 - Reimplement the feed refresh functionality to use regular threads instead of `tokio` and `futures-util`.
 - Remove `tokio` and `futures-util`.
