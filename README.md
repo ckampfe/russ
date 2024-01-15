@@ -167,7 +167,7 @@ Likewise, Russ may build with a nightly Rust compiler, but this is not a project
 
 ## SQLite version
 
-`russ` compiles and bundles its own embedded SQLite via the [Rusqlite](https://github.com/rusqlite/rusqlite) project, which is version 3.39.2.
+`russ` compiles and bundles its own embedded SQLite via the [Rusqlite](https://github.com/rusqlite/rusqlite) project, which is version 3.44.0.
 
 If you prefer to use the version of SQLite on your system, edit `Cargo.toml` to
 remove the `"bundled"` feature from the `rusqlite` dependency and recompile `russ`.
