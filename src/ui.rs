@@ -34,7 +34,7 @@ pub fn draw(f: &mut Frame, chunks: Rc<[Rect]>, app: &mut AppImpl) {
 
 fn draw_info_column(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     let mut constraints = match &app.mode {
-        Mode::Normal => vec![Constraint::Percentage(70), Constraint::Percentage(20)],
+        Mode::Normal => vec![Constraint::Percentage(70), Constraint::Percentage(30)],
         Mode::Editing => vec![
             Constraint::Percentage(60),
             Constraint::Percentage(20),
@@ -43,6 +43,7 @@ fn draw_info_column(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     };
 
     if app.show_help {
+        constraints[1] = Constraint::Percentage(20);
         constraints.push(Constraint::Percentage(10));
     }
 
@@ -343,7 +344,7 @@ fn draw_entries(f: &mut Frame, area: Rect, app: &mut AppImpl) {
 
     if !&app.error_flash.is_empty() {
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(60), Constraint::Percentage(30)].as_ref())
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
             .direction(Direction::Vertical)
             .split(area);
         {
