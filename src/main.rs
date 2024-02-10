@@ -1,15 +1,16 @@
 #![forbid(unsafe_code)]
 
 use crate::modes::{Mode, Selected};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use app::App;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use crossterm::event;
 use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use opml::Outline;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io::stdout;
@@ -28,39 +29,93 @@ pub enum Event<I> {
     Tick,
 }
 
-// Only used to take input at the boundary.
-// Turned into `Options` with `to_options()`.
 /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 #[derive(Clone, Debug, Parser)]
 #[command(author, version, about, name = "russ")]
-struct CliOptions {
-    /// Override where `russ` stores and reads feeds.
-    /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
-    /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
-    /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
-    #[arg(short, long)]
-    database_path: Option<PathBuf>,
-    /// time in ms between two ticks
-    #[arg(short, long, default_value = "250")]
-    tick_rate: u64,
-    /// number of seconds to show the flash message before clearing it
-    #[arg(short, long, default_value = "4", value_parser = parse_seconds)]
-    flash_display_duration_seconds: time::Duration,
-    /// RSS/Atom network request timeout in seconds
-    #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
-    network_timeout: time::Duration,
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
 }
 
-impl CliOptions {
-    fn to_options(&self) -> std::io::Result<Options> {
-        let database_path = get_database_path(self)?;
+#[derive(Clone, Debug, Subcommand)]
+enum Command {
+    /// Read feeds
+    Read {
+        /// Override where `russ` stores and reads feeds.
+        /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
+        /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
+        /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
+        #[arg(short, long)]
+        database_path: Option<PathBuf>,
+        /// time in ms between two ticks
+        #[arg(short, long, default_value = "250")]
+        tick_rate: u64,
+        /// number of seconds to show the flash message before clearing it
+        #[arg(short, long, default_value = "4", value_parser = parse_seconds)]
+        flash_display_duration_seconds: time::Duration,
+        /// RSS/Atom network request timeout in seconds
+        #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
+        network_timeout: time::Duration,
+    },
+    /// Import feeds from an OPML document
+    Import {
+        /// Override where `russ` stores and reads feeds.
+        /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
+        /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
+        /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
+        #[arg(short, long)]
+        database_path: Option<PathBuf>,
+        #[arg(short, long)]
+        opml_path: PathBuf,
+        /// RSS/Atom network request timeout in seconds
+        #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
+        network_timeout: time::Duration,
+    },
+}
 
-        Ok(Options {
-            database_path,
-            tick_rate: self.tick_rate,
-            flash_display_duration_seconds: self.flash_display_duration_seconds,
-            network_timeout: self.network_timeout,
-        })
+// Only used to take input at the boundary.
+// Turned into `Options` with `to_options()`.
+// /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
+// #[derive(Clone, Debug, Parser)]
+// #[command(author, version, about, name = "russ")]
+// struct CliOptions {
+//     /// Override where `russ` stores and reads feeds.
+//     /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
+//     /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
+//     /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
+//     #[arg(short, long)]
+//     database_path: Option<PathBuf>,
+//     /// time in ms between two ticks
+//     #[arg(short, long, default_value = "250")]
+//     tick_rate: u64,
+//     /// number of seconds to show the flash message before clearing it
+//     #[arg(short, long, default_value = "4", value_parser = parse_seconds)]
+//     flash_display_duration_seconds: time::Duration,
+//     /// RSS/Atom network request timeout in seconds
+//     #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
+//     network_timeout: time::Duration,
+// }
+
+impl Command {
+    fn to_options(&self) -> std::io::Result<Options> {
+        match self {
+            Command::Read {
+                database_path,
+                tick_rate,
+                flash_display_duration_seconds,
+                network_timeout,
+            } => {
+                let database_path = get_database_path(database_path)?;
+
+                Ok(Options {
+                    database_path,
+                    tick_rate: *tick_rate,
+                    flash_display_duration_seconds: *flash_display_duration_seconds,
+                    network_timeout: *network_timeout,
+                })
+            }
+            _ => todo!(),
+        }
     }
 }
 
@@ -82,8 +137,8 @@ pub struct Options {
     network_timeout: time::Duration,
 }
 
-fn get_database_path(cli_options: &CliOptions) -> std::io::Result<PathBuf> {
-    let database_path = if let Some(database_path) = cli_options.database_path.as_ref() {
+fn get_database_path(database_path: &Option<PathBuf>) -> std::io::Result<PathBuf> {
+    let database_path = if let Some(database_path) = database_path {
         database_path.to_owned()
     } else {
         let mut database_path = directories::ProjectDirs::from("", "", "russ")
@@ -272,10 +327,65 @@ fn clear_flash_after(sx: mpsc::Sender<IoCommand>, duration: time::Duration) {
     });
 }
 
-fn main() -> Result<()> {
-    let cli_options: CliOptions = CliOptions::parse();
+fn traverse_outlines(outlines: &[Outline]) -> Vec<String> {
+    let mut outlines_stack = outlines.to_owned();
+    let mut xml_urls = vec![];
 
-    let options = cli_options.to_options()?;
+    while let Some(this_outline) = outlines_stack.pop() {
+        outlines_stack.extend_from_slice(&this_outline.outlines);
+
+        if let Some(xml_url) = this_outline.xml_url {
+            xml_urls.push(xml_url);
+        }
+    }
+
+    xml_urls
+}
+
+fn main() -> Result<()> {
+    let command = Cli::parse();
+
+    if let Command::Import {
+        database_path,
+        opml_path,
+        network_timeout,
+    } = command.command
+    {
+        let database_path = get_database_path(&database_path)?;
+
+        let mut conn = rusqlite::Connection::open(database_path)?;
+
+        crate::rss::initialize_db(&mut conn)?;
+
+        let opml_file = std::fs::File::open(opml_path).context("must provide a valid OPML file")?;
+
+        let mut opml_reader = std::io::BufReader::new(opml_file);
+
+        let opml_document = opml::OPML::from_reader(&mut opml_reader)
+            .context("unable to parse provided OPML file")?;
+
+        let http_client = ureq::AgentBuilder::new()
+            .timeout_read(network_timeout)
+            .build();
+
+        let xml_urls = traverse_outlines(&opml_document.body.outlines);
+
+        for feed_url in xml_urls {
+            eprintln!(">>>>>>>>>>");
+            eprintln!("importing {}", feed_url);
+            match crate::rss::subscribe_to_feed(&http_client, &mut conn, &feed_url) {
+                Ok(_feed_id) => eprintln!("OK: subscribed to {feed_url}"),
+                Err(e) => {
+                    eprintln!("ERROR: {:?}", e);
+                }
+            };
+            eprintln!("<<<<<<<<<<");
+        }
+
+        return Ok(());
+    }
+
+    let options = command.command.to_options()?;
 
     enable_raw_mode()?;
 
