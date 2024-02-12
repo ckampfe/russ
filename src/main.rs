@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use crate::modes::{Mode, Selected};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use app::App;
 use clap::{Parser, Subcommand};
 use crossterm::event;
@@ -10,7 +10,6 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use opml::Outline;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io::stdout;
@@ -20,6 +19,7 @@ use std::{thread, time};
 
 mod app;
 mod modes;
+mod opml;
 mod rss;
 mod ui;
 mod util;
@@ -30,16 +30,18 @@ pub enum Event<I> {
 }
 
 /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
-#[derive(Clone, Debug, Parser)]
+#[derive(Debug, Parser)]
 #[command(author, version, about, name = "russ")]
-struct Cli {
+struct Options {
     #[command(subcommand)]
-    command: Command,
+    subcommand: Command,
 }
 
-#[derive(Clone, Debug, Subcommand)]
+/// Only used to take input at the boundary.
+/// Turned into `ValidatedOptions` with `validate()`.
+#[derive(Debug, Subcommand)]
 enum Command {
-    /// Read feeds
+    /// Read your feeds
     Read {
         /// Override where `russ` stores and reads feeds.
         /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
@@ -73,31 +75,8 @@ enum Command {
     },
 }
 
-// Only used to take input at the boundary.
-// Turned into `Options` with `to_options()`.
-// /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
-// #[derive(Clone, Debug, Parser)]
-// #[command(author, version, about, name = "russ")]
-// struct CliOptions {
-//     /// Override where `russ` stores and reads feeds.
-//     /// By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`.
-//     /// On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`.
-//     /// On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`.
-//     #[arg(short, long)]
-//     database_path: Option<PathBuf>,
-//     /// time in ms between two ticks
-//     #[arg(short, long, default_value = "250")]
-//     tick_rate: u64,
-//     /// number of seconds to show the flash message before clearing it
-//     #[arg(short, long, default_value = "4", value_parser = parse_seconds)]
-//     flash_display_duration_seconds: time::Duration,
-//     /// RSS/Atom network request timeout in seconds
-//     #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
-//     network_timeout: time::Duration,
-// }
-
 impl Command {
-    fn to_options(&self) -> std::io::Result<Options> {
+    fn validate(&self) -> std::io::Result<ValidatedOptions> {
         match self {
             Command::Read {
                 database_path,
@@ -107,14 +86,25 @@ impl Command {
             } => {
                 let database_path = get_database_path(database_path)?;
 
-                Ok(Options {
+                Ok(ValidatedOptions::Read(ReadOptions {
                     database_path,
                     tick_rate: *tick_rate,
                     flash_display_duration_seconds: *flash_display_duration_seconds,
                     network_timeout: *network_timeout,
-                })
+                }))
             }
-            _ => todo!(),
+            Command::Import {
+                database_path,
+                opml_path,
+                network_timeout,
+            } => {
+                let database_path = get_database_path(database_path)?;
+                Ok(ValidatedOptions::Import(ImportOptions {
+                    database_path,
+                    opml_path: opml_path.to_owned(),
+                    network_timeout: *network_timeout,
+                }))
+            }
         }
     }
 }
@@ -124,16 +114,25 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
     Ok(time::Duration::from_secs(as_u64))
 }
 
-/// internal, validated options
+/// internal, validated options for the normal reader mode
+#[derive(Debug)]
+enum ValidatedOptions {
+    Read(ReadOptions),
+    Import(ImportOptions),
+}
+
 #[derive(Clone, Debug)]
-pub struct Options {
-    /// feed database path
+struct ReadOptions {
     database_path: PathBuf,
-    /// time in ms between two ticks
     tick_rate: u64,
-    /// number of seconds to show the flash message before clearing it
     flash_display_duration_seconds: time::Duration,
-    /// RSS/Atom network request timeout in seconds
+    network_timeout: time::Duration,
+}
+
+#[derive(Debug)]
+struct ImportOptions {
+    database_path: PathBuf,
+    opml_path: PathBuf,
     network_timeout: time::Duration,
 }
 
@@ -168,7 +167,7 @@ fn io_loop(
     app: App,
     sx: mpsc::Sender<IoCommand>,
     rx: mpsc::Receiver<IoCommand>,
-    options: &Options,
+    options: &ReadOptions,
 ) -> Result<()> {
     use IoCommand::*;
 
@@ -327,66 +326,7 @@ fn clear_flash_after(sx: mpsc::Sender<IoCommand>, duration: time::Duration) {
     });
 }
 
-fn traverse_outlines(outlines: &[Outline]) -> Vec<String> {
-    let mut outlines_stack = outlines.to_owned();
-    let mut xml_urls = vec![];
-
-    while let Some(this_outline) = outlines_stack.pop() {
-        outlines_stack.extend_from_slice(&this_outline.outlines);
-
-        if let Some(xml_url) = this_outline.xml_url {
-            xml_urls.push(xml_url);
-        }
-    }
-
-    xml_urls
-}
-
-fn main() -> Result<()> {
-    let command = Cli::parse();
-
-    if let Command::Import {
-        database_path,
-        opml_path,
-        network_timeout,
-    } = command.command
-    {
-        let database_path = get_database_path(&database_path)?;
-
-        let mut conn = rusqlite::Connection::open(database_path)?;
-
-        crate::rss::initialize_db(&mut conn)?;
-
-        let opml_file = std::fs::File::open(opml_path).context("must provide a valid OPML file")?;
-
-        let mut opml_reader = std::io::BufReader::new(opml_file);
-
-        let opml_document = opml::OPML::from_reader(&mut opml_reader)
-            .context("unable to parse provided OPML file")?;
-
-        let http_client = ureq::AgentBuilder::new()
-            .timeout_read(network_timeout)
-            .build();
-
-        let xml_urls = traverse_outlines(&opml_document.body.outlines);
-
-        for feed_url in xml_urls {
-            eprintln!(">>>>>>>>>>");
-            eprintln!("importing {}", feed_url);
-            match crate::rss::subscribe_to_feed(&http_client, &mut conn, &feed_url) {
-                Ok(_feed_id) => eprintln!("OK: subscribed to {feed_url}"),
-                Err(e) => {
-                    eprintln!("ERROR: {:?}", e);
-                }
-            };
-            eprintln!("<<<<<<<<<<");
-        }
-
-        return Ok(());
-    }
-
-    let options = command.command.to_options()?;
-
+fn run_reader(options: ReadOptions) -> Result<()> {
     enable_raw_mode()?;
 
     let mut stdout = stdout();
@@ -517,4 +457,15 @@ fn main() -> Result<()> {
         .expect("Unable to join IO thread to main thread")?;
 
     Ok(())
+}
+
+fn main() -> Result<()> {
+    let options = Options::parse();
+
+    let validated_options = options.subcommand.validate()?;
+
+    match validated_options {
+        ValidatedOptions::Import(options) => crate::opml::import(options),
+        ValidatedOptions::Read(options) => run_reader(options),
+    }
 }
