@@ -111,11 +111,11 @@ impl App {
             (KeyCode::Down, _) | (KeyCode::Char('j'), _) => self.on_down(),
             (KeyCode::Up, _) | (KeyCode::Char('k'), _) => self.on_up(),
             (KeyCode::Right, _) | (KeyCode::Char('l'), _) => self.on_right(),
-            (KeyCode::PageUp, _) => {
+            (KeyCode::PageUp, _) | (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
                 self.page_up();
                 Ok(())
             }
-            (KeyCode::PageDown, _) => {
+            (KeyCode::PageDown, _) | (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
                 self.page_down();
                 Ok(())
             }
