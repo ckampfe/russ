@@ -248,8 +248,19 @@ pub fn subscribe_to_feed(
     match feed_and_entries {
         FeedResponse::CacheMiss(feed_and_entries) => {
             let feed_id = in_transaction(conn, |tx| {
-                let feed_id = create_feed(tx, &feed_and_entries.feed)?;
-                add_entries_to_feed(tx, feed_id, &feed_and_entries.entries)?;
+                let feed_id = create_feed(tx, &feed_and_entries.feed).with_context(|| {
+                    format!(
+                        "creating feed {:?} failed",
+                        &feed_and_entries.feed.feed_link
+                    )
+                })?;
+                add_entries_to_feed(tx, feed_id, &feed_and_entries.entries).with_context(|| {
+                    format!(
+                        "inserting {} entries for feed {:?} failed",
+                        &feed_and_entries.entries.len(),
+                        &feed_and_entries.feed.feed_link
+                    )
+                })?;
                 Ok(feed_id)
             })?;
 
@@ -423,6 +434,15 @@ pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
             tx.pragma_update(None, "user_version", 2)?;
 
             tx.execute("ALTER TABLE feeds ADD COLUMN latest_etag TEXT", [])?;
+        }
+
+        if schema_version <= 2 {
+            tx.pragma_update(None, "user_version", 3)?;
+
+            tx.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS feeds_feed_link ON feeds (feed_link)",
+                [],
+            )?;
         }
 
         Ok(())

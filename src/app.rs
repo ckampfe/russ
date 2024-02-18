@@ -68,7 +68,7 @@ impl App {
     ];
 
     pub fn new(
-        options: crate::Options,
+        options: crate::ReadOptions,
         event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
     ) -> Result<App> {
         Ok(App {
@@ -195,7 +195,7 @@ pub struct AppImpl {
 
 impl AppImpl {
     pub fn new(
-        options: crate::Options,
+        options: crate::ReadOptions,
         event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
     ) -> Result<AppImpl> {
         let mut conn = rusqlite::Connection::open(&options.database_path)?;
