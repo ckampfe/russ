@@ -477,21 +477,16 @@ fn add_entries_to_feed(
     if !entries.is_empty() {
         let now = Utc::now();
 
-        let columns = [
-            "feed_id",
-            "title",
-            "author",
-            "pub_date",
-            "description",
-            "content",
-            "link",
-            "updated_at",
-        ];
+        let mut insert_statement = tx.prepare(
+            "INSERT INTO entries (feed_id, title, author, pub_date, description, content, link, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )?;
 
-        let mut entries_values = Vec::with_capacity(entries.len() * columns.len());
-
+        // in most databases, doing this kind of "multiple inserts in a loop" thing would be bad and slow, but it's ok here because:
+        // 1. it is within single a transaction. in SQLite, doing many writes in the same transaction is actually fast
+        // 2. it is with single prepared statement, which further improves its write throughput
+        // see further: https://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
         for entry in entries {
-            let values = params![
+            insert_statement.execute(params![
                 feed_id,
                 entry.title,
                 entry.author,
@@ -499,61 +494,12 @@ fn add_entries_to_feed(
                 entry.description,
                 entry.content,
                 entry.link,
-                now,
-            ];
-            entries_values.extend_from_slice(values);
+                now
+            ])?;
         }
-
-        let query = build_bulk_insert_query("entries", &columns, entries);
-
-        tx.execute(&query, entries_values.as_slice())?;
     }
 
     Ok(())
-}
-
-fn build_bulk_insert_query<C: AsRef<str>, R>(table: &str, columns: &[C], rows: &[R]) -> String {
-    let idxs = (1..(rows.len() * columns.len() + 1)).collect::<Vec<_>>();
-
-    let values_groups_string = idxs
-        .chunks(columns.len())
-        .map(|chunk| {
-            let values_string = chunk
-                .iter()
-                .map(|i| format!("?{i}"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            ["(", &values_string, ")"].concat()
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    let columns_strs = columns
-        .iter()
-        .map(|column| column.as_ref())
-        .collect::<Vec<&str>>();
-
-    let columns_joined = columns_strs.join(", ");
-
-    let mut query = String::with_capacity(
-        "INSERT INTO ".len()
-            + table.len()
-            + 1 // '(' is a char
-            + columns_joined.len()
-            + ") ".len()
-            + "VALUES ".len()
-            + values_groups_string.len(),
-    );
-
-    query.push_str("INSERT INTO ");
-    query.push_str(table);
-    query.push('(');
-    query.push_str(&columns_joined);
-    query.push_str(") ");
-    query.push_str("VALUES ");
-    query.push_str(&values_groups_string);
-
-    query
 }
 
 pub fn get_feed(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Feed> {
@@ -861,29 +807,6 @@ mod tests {
         let new_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
         assert_eq!(new_entries.len(), old_entries.len() - 1);
-    }
-
-    #[test]
-    fn build_bulk_insert_query() {
-        let entries = vec!["entry1", "entry2"];
-        let query = super::build_bulk_insert_query(
-            "entries",
-            &[
-                "feed_id",
-                "title",
-                "author",
-                "pub_date",
-                "description",
-                "content",
-                "link",
-                "updated_at",
-            ],
-            &entries,
-        );
-        assert_eq!(
-            query,
-            "INSERT INTO entries(feed_id, title, author, pub_date, description, content, link, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8), (?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)"
-        );
     }
 
     #[test]
