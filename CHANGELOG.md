@@ -4,6 +4,7 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 
 ## Unreleased
 
+- Add the import of OPML files
 - Bump `ratatui` to `0.26` and fix a few resulting breakages
 - Bump `html2text` to `0.12`
 - Bump lots of transitive dependencies
