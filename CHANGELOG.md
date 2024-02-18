@@ -9,6 +9,8 @@ A great way to contribute is to improve the README or documentation!
 - Implement `ctrl-d` and `ctrl-u` for page scrolling, thank you @Jaco-Minnaar (https://github.com/ckampfe/russ/pull/31)
 - Bump `ratatui` to `0.26` and fix a few resulting breakages
 - Bump `html2text` to `0.12`
+- Bump `rusqlite` to `0.31`
+- Bump `r2d2_sqlite` to `0.24`
 - Bump lots of transitive dependencies
 
 ## 0.5.0
