@@ -16,10 +16,10 @@ $ cargo install russ --git https://github.com/ckampfe/russ
 
   note that on linux, you will need these system dependencies as well, for example:
 $ sudo apt update && sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev
-$ russ
+$ russ read
 ```
 
-**Note** that on its first run with no arguments, `russ` creates a SQLite database file called `feeds.db` to store RSS/Atom feeds in a location of its choosing. If you wish to override this, you can pass a path with the `-d` option, like `russ -d /your/database/location/my_feeds.db`. If you use a custom database location, you will need to pass the `-d` option every time you invoke `russ`. See the help with `russ -h` for more information about where `russ` will store the `feeds.db` database by default on your platform.
+**Note** that on its first run with no arguments, `russ read` creates a SQLite database file called `feeds.db` to store RSS/Atom feeds in a location of its choosing. If you wish to override this, you can pass a path with the `-d` option, like `russ -d /your/database/location/my_feeds.db`. If you use a custom database location, you will need to pass the `-d` option every time you invoke `russ`. See the help with `russ -h` for more information about where `russ` will store the `feeds.db` database by default on your platform.
 
 I do not currently publish binary releases, but that may change if someone is interested in that.
 
@@ -36,6 +36,8 @@ In insert mode, you enter the URL of a feed you wish to begin following, and Rus
 
 That's basically it!
 
+Russ can also import feeds from an OPML file. See below for more details.
+
 ### controls - normal mode
 
 Some normal mode controls vary based on whether you are currently selecting a feed or an entry.
@@ -50,6 +52,7 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 - `a` - toggle between read/unread entries
 - `c` - copy the selected link to the clipboard (feed or entry)
 - `o` - open the selected link in your browser (feed or entry)
+- `ctrl-u`/`ctrl-d` - scroll up/down a page at a time
 
 ### controls - insert mode
 
@@ -63,7 +66,25 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 $ russ -h
 A TUI RSS reader with vim-like controls and a local-first, offline-first focus
 
-Usage: russ [OPTIONS]
+Usage: russ <COMMAND>
+
+Commands:
+  read    Read your feeds
+  import  Import feeds from an OPML document
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+## read mode
+
+```console
+$ russ read -h
+Read your feeds
+
+Usage: russ read [OPTIONS]
 
 Options:
   -d, --database-path <DATABASE_PATH>
@@ -76,9 +97,25 @@ Options:
           RSS/Atom network request timeout in seconds [default: 5]
   -h, --help
           Print help
-  -V, --version
-          Print version
+```
 
+## import OPML mode
+
+```console
+$ russ import -h
+Import feeds from an OPML document
+
+Usage: russ import [OPTIONS] --opml-path <OPML_PATH>
+
+Options:
+  -d, --database-path <DATABASE_PATH>
+          Override where `russ` stores and reads feeds. By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`. On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`. On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`
+  -o, --opml-path <OPML_PATH>
+
+  -n, --network-timeout <NETWORK_TIMEOUT>
+          RSS/Atom network request timeout in seconds [default: 5]
+  -h, --help
+          Print help
 ```
 
 ## design
@@ -113,9 +150,10 @@ This is not a strict feature list, and it is not a roadmap. Unchecked items are 
 - [ ] visual indicator for which feeds have new/unacknowledged entries
 - [ ] profiling mode that shows speed of UI interaction
 - [ ] stabilize the database schema
-- [ ] migration process for database changes
 - [ ] automatically fetch entries that only provide a link field
 - [ ] debug view (show app state)
+- [x] import OPML feeds
+- [x] migration process for database changes
 - [x] rss support
 - [x] atom support
 - [x] vim-style hjkl navigation
