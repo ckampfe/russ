@@ -1,6 +1,7 @@
 # Changelog
 
 I welcome contributions to Russ. If you have an idea for something you would like to contribute, open an issue and we can talk about it!
+A great way to contribute is to improve the README or documentation!
 
 ## Unreleased
 
