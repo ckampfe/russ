@@ -4,7 +4,8 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 
 ## Unreleased
 
-- Add the import of OPML files
+- Add the import of OPML files (https://github.com/ckampfe/russ/pull/32)
+- Implement `ctrl-d` and `ctrl-u for page scrolling, thank you @Jaco-Minnaar (https://github.com/ckampfe/russ/pull/31)
 - Bump `ratatui` to `0.26` and fix a few resulting breakages
 - Bump `html2text` to `0.12`
 - Bump lots of transitive dependencies
