@@ -1,8 +1,7 @@
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::util;
+use crate::{util, IoCommand};
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
-use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::sync::{Arc, Mutex};
 
@@ -37,20 +36,21 @@ impl App {
     delegate_to_locked_inner![
         (error_flash_is_empty, bool),
         (feed_ids, Result<Vec<crate::rss::FeedId>>),
-        (feed_subscription_input, String),
         (force_redraw, Result<()>),
         (http_client, ureq::Agent),
         (mode, Mode),
         (selected, Selected),
-        (selected_feed_id, crate::rss::FeedId),
         (open_link_in_browser, Result<()>),
+        (should_quit, bool),
+        (refresh_feed, Result<()>),
+        (subscribe_to_feed, Result<()>),
+        (feed_subscription_input_is_empty, bool)
     ];
 
     delegate_to_locked_mut_inner![
         (clear_error_flash, ()),
         (clear_flash, ()),
         (on_down, Result<()>),
-        (on_enter, Result<()>),
         (on_left, Result<()>),
         (on_right, Result<()>),
         (on_up, Result<()>),
@@ -65,14 +65,16 @@ impl App {
         (toggle_read, Result<()>),
         (toggle_read_mode, Result<()>),
         (update_current_feed_and_entries, Result<()>),
+        (select_and_show_current_entry, Result<()>)
     ];
 
     pub fn new(
         options: crate::ReadOptions,
-        event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+        event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+        io_tx: std::sync::mpsc::Sender<IoCommand>,
     ) -> Result<App> {
         Ok(App {
-            inner: Arc::new(Mutex::new(AppImpl::new(options, event_s)?)),
+            inner: Arc::new(Mutex::new(AppImpl::new(options, event_tx, io_tx)?)),
         })
     }
 
@@ -91,7 +93,7 @@ impl App {
 
             if inner.entry_column_width != new_width {
                 inner.entry_column_width = new_width;
-                inner.on_enter().unwrap_or_else(|e| {
+                inner.select_and_show_current_entry().unwrap_or_else(|e| {
                     inner.error_flash = vec![e];
                 })
             }
@@ -104,34 +106,9 @@ impl App {
         Ok(())
     }
 
-    pub fn on_key(&self, keycode: KeyCode, modifiers: KeyModifiers) -> Result<()> {
-        match (keycode, modifiers) {
-            // movement
-            (KeyCode::Left, _) | (KeyCode::Char('h'), _) => self.on_left(),
-            (KeyCode::Down, _) | (KeyCode::Char('j'), _) => self.on_down(),
-            (KeyCode::Up, _) | (KeyCode::Char('k'), _) => self.on_up(),
-            (KeyCode::Right, _) | (KeyCode::Char('l'), _) => self.on_right(),
-            (KeyCode::PageUp, _) | (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
-                self.page_up();
-                Ok(())
-            }
-            (KeyCode::PageDown, _) | (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
-                self.page_down();
-                Ok(())
-            }
-            // modes, selections, editing, etc.
-            (KeyCode::Enter, _) => self.on_enter(),
-            (KeyCode::Char('?'), _) => self.toggle_help(),
-            (KeyCode::Char('a'), _) => self.toggle_read_mode(),
-            (KeyCode::Char('e'), _) | (KeyCode::Char('i'), _) => {
-                let mut inner = self.inner.lock().unwrap();
-                inner.mode = Mode::Editing;
-                Ok(())
-            }
-            (KeyCode::Char('c'), _) => self.put_current_link_in_clipboard(),
-            (KeyCode::Char('o'), _) => self.open_link_in_browser(),
-            _ => Ok(()),
-        }
+    pub fn set_should_quit(&mut self, should_quit: bool) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.should_quit = should_quit
     }
 
     pub fn set_flash(&self, flash: String) {
@@ -158,6 +135,29 @@ impl App {
         let mut inner = self.inner.lock().unwrap();
         let feeds = feeds.into();
         inner.feeds = feeds;
+    }
+
+    pub(crate) fn refresh_feeds(&self) -> Result<()> {
+        let feed_ids = self.feed_ids()?;
+        let inner = self.inner.lock().unwrap();
+        inner.io_tx.send(IoCommand::RefreshFeeds(feed_ids))?;
+        Ok(())
+    }
+
+    pub(crate) fn break_io_thread(&self) -> Result<()> {
+        let inner = self.inner.lock().unwrap();
+        inner.io_tx.send(IoCommand::Break)?;
+        Ok(())
+    }
+
+    pub(crate) fn has_entries(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        !inner.entries.items.is_empty()
+    }
+
+    pub(crate) fn has_current_entry(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.current_entry_meta.is_some()
     }
 }
 
@@ -189,14 +189,16 @@ pub struct AppImpl {
     pub error_flash: Vec<anyhow::Error>,
     pub feed_subscription_input: String,
     pub flash: Option<String>,
-    event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+    event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+    io_tx: std::sync::mpsc::Sender<IoCommand>,
     pub is_wsl: bool,
 }
 
 impl AppImpl {
     pub fn new(
         options: crate::ReadOptions,
-        event_s: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+        event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
+        io_tx: std::sync::mpsc::Sender<IoCommand>,
     ) -> Result<AppImpl> {
         let mut conn = rusqlite::Connection::open(&options.database_path)?;
 
@@ -236,8 +238,9 @@ impl AppImpl {
             show_help: true,
             entry_selection_position: 0,
             flash: None,
-            event_s,
+            event_tx,
             is_wsl,
+            io_tx,
         };
 
         app.update_feeds()?;
@@ -346,7 +349,7 @@ impl AppImpl {
         };
     }
 
-    fn get_selected_entry(&self) -> Option<Result<crate::rss::EntryContent>> {
+    fn get_selected_entry_content(&self) -> Option<Result<crate::rss::EntryContent>> {
         self.entries.state.selected().and_then(|selected_idx| {
             self.entries
                 .items
@@ -400,53 +403,59 @@ impl AppImpl {
         }
     }
 
-    pub fn on_enter(&mut self) -> Result<()> {
-        match self.selected {
-            Selected::Entries | Selected::Entry(_) => {
-                if !self.entries.items.is_empty() {
-                    if let Some(entry_meta) = &self.current_entry_meta {
-                        if let Some(entry) = self.get_selected_entry() {
-                            let entry = entry?;
-                            let empty_string =
-                                String::from("No content or description tag provided.");
+    pub(crate) fn select_and_show_current_entry(&mut self) -> Result<()> {
+        if let Some(entry_meta) = &self.current_entry_meta {
+            let entry_meta = entry_meta.clone();
 
-                            // try content tag first,
-                            // if there is not content tag,
-                            // go to description tag,
-                            // if no description tag,
-                            // use empty string.
-                            // TODO figure out what to actually do if there are neither
-                            let entry_html = entry
-                                .content
-                                .as_ref()
-                                .or(entry.description.as_ref())
-                                .or(Some(&empty_string));
+            if let Some(entry) = self.get_selected_entry_content() {
+                let entry = entry?;
+                let empty_string = String::from("No content or description tag provided.");
 
-                            // minimum is 1
-                            let line_length = if self.entry_column_width >= 5 {
-                                self.entry_column_width - 4
-                            } else {
-                                1
-                            };
+                // try content tag first,
+                // if there is not content tag,
+                // go to description tag,
+                // if no description tag,
+                // use empty string.
+                // TODO figure out what to actually do if there are neither
+                let entry_html = entry
+                    .content
+                    .as_ref()
+                    .or(entry.description.as_ref())
+                    .or(Some(&empty_string));
 
-                            if let Some(html) = entry_html {
-                                let text =
-                                    html2text::from_read(html.as_bytes(), line_length.into());
-                                self.entry_lines_len = text.matches('\n').count();
-                                self.current_entry_text = text;
-                            } else {
-                                self.current_entry_text = String::new();
-                            }
-                        }
+                // minimum is 1
+                let line_length = if self.entry_column_width >= 5 {
+                    self.entry_column_width - 4
+                } else {
+                    1
+                };
 
-                        self.selected = Selected::Entry(entry_meta.clone());
-                    }
+                if let Some(html) = entry_html {
+                    let text = html2text::from_read(html.as_bytes(), line_length.into());
+                    self.entry_lines_len = text.matches('\n').count();
+                    self.current_entry_text = text;
+                } else {
+                    self.current_entry_text = String::new();
                 }
-
-                Ok(())
             }
-            _ => Ok(()),
+
+            self.selected = Selected::Entry(entry_meta);
         }
+
+        Ok(())
+    }
+
+    pub(crate) fn refresh_feed(&self) -> Result<()> {
+        let feed_id = self.selected_feed_id();
+        self.io_tx.send(IoCommand::RefreshFeed(feed_id))?;
+        Ok(())
+    }
+
+    pub(crate) fn subscribe_to_feed(&self) -> Result<()> {
+        let feed_subscription_input = self.feed_subscription_input();
+        self.io_tx
+            .send(IoCommand::SubscribeToFeed(feed_subscription_input))?;
+        Ok(())
     }
 
     pub fn toggle_help(&mut self) -> Result<()> {
@@ -464,6 +473,10 @@ impl AppImpl {
 
     pub fn pop_feed_subscription_input(&mut self) {
         self.feed_subscription_input.pop();
+    }
+
+    pub fn feed_subscription_input_is_empty(&self) -> bool {
+        self.feed_subscription_input.is_empty()
     }
 
     pub fn feed_subscription_input(&self) -> String {
@@ -497,8 +510,7 @@ impl AppImpl {
     }
 
     pub fn toggle_read(&mut self) -> Result<()> {
-        let selected = self.selected.clone();
-        match selected {
+        match &self.selected {
             Selected::Entry(entry) => {
                 entry.toggle_read(&self.conn)?;
                 self.selected = Selected::Entries;
@@ -601,6 +613,10 @@ impl AppImpl {
         }
     }
 
+    fn should_quit(&self) -> bool {
+        self.should_quit
+    }
+
     pub fn on_left(&mut self) -> Result<()> {
         match self.selected {
             Selected::Feeds => (),
@@ -655,7 +671,7 @@ impl AppImpl {
                 }
                 Ok(())
             }
-            Selected::Entries => self.on_enter(),
+            Selected::Entries => self.select_and_show_current_entry(),
             Selected::Entry(_) => Ok(()),
             Selected::None => Ok(()),
         }
@@ -690,6 +706,6 @@ impl AppImpl {
     }
 
     pub fn force_redraw(&self) -> Result<()> {
-        self.event_s.send(crate::Event::Tick).map_err(|e| e.into())
+        self.event_tx.send(crate::Event::Tick).map_err(|e| e.into())
     }
 }
