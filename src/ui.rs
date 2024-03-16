@@ -271,7 +271,7 @@ fn draw_help(f: &mut Frame, area: Rect, app: &mut AppImpl) {
         }
         _ => {
             text.push_str("r - mark entry read/un; a - toggle view read/un\n");
-            text.push_str("c - copy link; o - open link in browser\n")
+            text.push_str("c - copy link; o - open link in browser\n");
         }
     }
     match app.mode {

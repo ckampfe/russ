@@ -1,6 +1,7 @@
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
 use anyhow::Result;
+use article_scraper::ArticleScraper;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -130,6 +131,7 @@ impl App {
             }
             (KeyCode::Char('c'), _) => self.put_current_link_in_clipboard(),
             (KeyCode::Char('o'), _) => self.open_link_in_browser(),
+            (KeyCode::Char('s'), _) => self.scrape_current_entry(),
             _ => Ok(()),
         }
     }
@@ -158,6 +160,43 @@ impl App {
         let mut inner = self.inner.lock().unwrap();
         let feeds = feeds.into();
         inner.feeds = feeds;
+    }
+
+    pub fn scrape_current_entry(&self) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        let link = &inner
+            .current_entry_meta
+            .as_ref()
+            .and_then(|entry| entry.link.as_ref());
+
+        if let Some(link) = link {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .enable_io()
+                .build()?;
+            let content = rt.block_on(async {
+                let scraper = ArticleScraper::new(None).await;
+                if let Ok(url) = url::Url::parse(link.as_ref()) {
+                    let client = reqwest::Client::new();
+                    if let Ok(article) = scraper.parse(&url, false, &client, None).await {
+                        return article.html;
+                    }
+                }
+                None
+            });
+
+            if let Some(content) = content {
+                let line_length = if inner.entry_column_width >= 5 {
+                    inner.entry_column_width - 4
+                } else {
+                    1
+                };
+                inner.current_entry_text =
+                    html2text::from_read(content.as_bytes(), line_length as usize)
+            }
+        }
+
+        Ok(())
     }
 }
 
