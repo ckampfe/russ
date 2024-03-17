@@ -1,7 +1,7 @@
 //! The main application state is managed here, in `App`.
 
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::{util, IoCommand};
+use crate::util;
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -73,7 +73,7 @@ impl App {
     pub fn new(
         options: crate::ReadOptions,
         event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
-        io_tx: std::sync::mpsc::Sender<IoCommand>,
+        io_tx: std::sync::mpsc::Sender<crate::io::Action>,
     ) -> Result<App> {
         Ok(App {
             inner: Arc::new(Mutex::new(AppImpl::new(options, event_tx, io_tx)?)),
@@ -142,13 +142,15 @@ impl App {
     pub(crate) fn refresh_feeds(&self) -> Result<()> {
         let feed_ids = self.feed_ids()?;
         let inner = self.inner.lock().unwrap();
-        inner.io_tx.send(IoCommand::RefreshFeeds(feed_ids))?;
+        inner
+            .io_tx
+            .send(crate::io::Action::RefreshFeeds(feed_ids))?;
         Ok(())
     }
 
     pub(crate) fn break_io_thread(&self) -> Result<()> {
         let inner = self.inner.lock().unwrap();
-        inner.io_tx.send(IoCommand::Break)?;
+        inner.io_tx.send(crate::io::Action::Break)?;
         Ok(())
     }
 
@@ -192,7 +194,7 @@ pub struct AppImpl {
     pub feed_subscription_input: String,
     pub flash: Option<String>,
     event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
-    io_tx: std::sync::mpsc::Sender<IoCommand>,
+    io_tx: std::sync::mpsc::Sender<crate::io::Action>,
     pub is_wsl: bool,
 }
 
@@ -200,7 +202,7 @@ impl AppImpl {
     pub fn new(
         options: crate::ReadOptions,
         event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,
-        io_tx: std::sync::mpsc::Sender<IoCommand>,
+        io_tx: std::sync::mpsc::Sender<crate::io::Action>,
     ) -> Result<AppImpl> {
         let mut conn = rusqlite::Connection::open(&options.database_path)?;
 
@@ -449,14 +451,14 @@ impl AppImpl {
 
     pub(crate) fn refresh_feed(&self) -> Result<()> {
         let feed_id = self.selected_feed_id();
-        self.io_tx.send(IoCommand::RefreshFeed(feed_id))?;
+        self.io_tx.send(crate::io::Action::RefreshFeed(feed_id))?;
         Ok(())
     }
 
     pub(crate) fn subscribe_to_feed(&self) -> Result<()> {
         let feed_subscription_input = self.feed_subscription_input();
         self.io_tx
-            .send(IoCommand::SubscribeToFeed(feed_subscription_input))?;
+            .send(crate::io::Action::SubscribeToFeed(feed_subscription_input))?;
         Ok(())
     }
 

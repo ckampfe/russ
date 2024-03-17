@@ -18,6 +18,7 @@ use std::sync::mpsc;
 use std::{thread, time};
 
 mod app;
+mod io;
 mod modes;
 mod opml;
 mod rss;
@@ -33,11 +34,6 @@ fn main() -> Result<()> {
         ValidatedOptions::Import(options) => crate::opml::import(options),
         ValidatedOptions::Read(options) => run_reader(options),
     }
-}
-
-pub enum Event<I> {
-    Input(I),
-    Tick,
 }
 
 /// A TUI RSS reader with vim-like controls and a local-first, offline-first focus
@@ -166,175 +162,9 @@ fn get_database_path(database_path: &Option<PathBuf>) -> std::io::Result<PathBuf
     Ok(database_path)
 }
 
-enum IoCommand {
-    Break,
-    RefreshFeed(crate::rss::FeedId),
-    RefreshFeeds(Vec<crate::rss::FeedId>),
-    SubscribeToFeed(String),
-    ClearFlash,
-}
-
-fn io_loop(
-    app: App,
-    tx: mpsc::Sender<IoCommand>,
-    rx: mpsc::Receiver<IoCommand>,
-    options: &ReadOptions,
-) -> Result<()> {
-    use IoCommand::*;
-
-    let manager = r2d2_sqlite::SqliteConnectionManager::file(&options.database_path);
-    let connection_pool = r2d2::Pool::new(manager)?;
-
-    while let Ok(event) = rx.recv() {
-        match event {
-            Break => break,
-            RefreshFeed(feed_id) => {
-                let now = std::time::Instant::now();
-
-                app.set_flash("Refreshing feed...".to_string());
-                app.force_redraw()?;
-
-                refresh_feeds(&app, &connection_pool, &[feed_id], |_app, fetch_result| {
-                    if let Err(e) = fetch_result {
-                        app.push_error_flash(e)
-                    }
-                })?;
-
-                app.update_current_feed_and_entries()?;
-                let elapsed = now.elapsed();
-                app.set_flash(format!("Refreshed feed in {elapsed:?}"));
-                app.force_redraw()?;
-                clear_flash_after(tx.clone(), options.flash_display_duration_seconds);
-            }
-            RefreshFeeds(feed_ids) => {
-                let now = std::time::Instant::now();
-
-                app.set_flash("Refreshing all feeds...".to_string());
-                app.force_redraw()?;
-
-                let all_feeds_len = feed_ids.len();
-                let mut successfully_refreshed_len = 0usize;
-
-                refresh_feeds(&app, &connection_pool, &feed_ids, |app, fetch_result| {
-                    match fetch_result {
-                        Ok(_) => successfully_refreshed_len += 1,
-                        Err(e) => app.push_error_flash(e),
-                    }
-                })?;
-
-                {
-                    app.update_current_feed_and_entries()?;
-
-                    let elapsed = now.elapsed();
-                    app.set_flash(format!(
-                        "Refreshed {successfully_refreshed_len}/{all_feeds_len} feeds in {elapsed:?}"
-                    ));
-                    app.force_redraw()?;
-                }
-
-                clear_flash_after(tx.clone(), options.flash_display_duration_seconds);
-            }
-            SubscribeToFeed(feed_subscription_input) => {
-                let now = std::time::Instant::now();
-
-                app.set_flash("Subscribing to feed...".to_string());
-                app.force_redraw()?;
-
-                let mut conn = connection_pool.get()?;
-                let r = crate::rss::subscribe_to_feed(
-                    &app.http_client(),
-                    &mut conn,
-                    &feed_subscription_input,
-                );
-
-                if let Err(e) = r {
-                    app.push_error_flash(e);
-                    continue;
-                }
-
-                match crate::rss::get_feeds(&conn) {
-                    Ok(feeds) => {
-                        {
-                            app.reset_feed_subscription_input();
-                            app.set_feeds(feeds);
-                            app.select_feeds();
-                            app.update_current_feed_and_entries()?;
-
-                            let elapsed = now.elapsed();
-                            app.set_flash(format!("Subscribed in {elapsed:?}"));
-                            app.set_mode(Mode::Normal);
-                            app.force_redraw()?;
-                        }
-
-                        clear_flash_after(tx.clone(), options.flash_display_duration_seconds);
-                    }
-                    Err(e) => {
-                        app.push_error_flash(e);
-                    }
-                }
-            }
-            ClearFlash => {
-                app.clear_flash();
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn refresh_feeds<F>(
-    app: &App,
-    connection_pool: &r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
-    feed_ids: &[crate::rss::FeedId],
-    mut refresh_result_handler: F,
-) -> Result<()>
-where
-    F: FnMut(&App, anyhow::Result<()>),
-{
-    let min_number_of_threads = num_cpus::get() * 2;
-    let chunk_size = feed_ids.len() / min_number_of_threads;
-    // due to usize floor division, it's possible chunk_size would be 0,
-    // so ensure it is at least 1
-    let chunk_size = chunk_size.max(1);
-    let chunks = feed_ids.chunks(chunk_size);
-
-    let join_handles: Vec<_> = chunks
-        .map(|chunk_feed_ids| {
-            let pool_get_result = connection_pool.get();
-            let http = app.http_client();
-            let chunk_feed_ids = chunk_feed_ids.to_owned();
-
-            thread::spawn(move || -> Result<Vec<Result<(), anyhow::Error>>> {
-                let mut results = vec![];
-                let mut conn = pool_get_result?;
-
-                for feed_id in chunk_feed_ids.into_iter() {
-                    results.push(crate::rss::refresh_feed(&http, &mut conn, feed_id))
-                }
-
-                Ok::<Vec<Result<(), anyhow::Error>>, anyhow::Error>(results)
-            })
-        })
-        .collect();
-
-    for join_handle in join_handles {
-        let chunk_results = join_handle
-            .join()
-            .expect("unable to join worker thread to io thread");
-        for chunk_result in chunk_results? {
-            refresh_result_handler(app, chunk_result)
-        }
-    }
-
-    Ok(())
-}
-
-fn clear_flash_after(tx: mpsc::Sender<IoCommand>, duration: time::Duration) {
-    thread::spawn(move || {
-        thread::sleep(duration);
-        tx.send(IoCommand::ClearFlash)
-            .expect("Unable to send IOCommand::ClearFlash");
-    });
+pub enum Event<I> {
+    Input(I),
+    Tick,
 }
 
 fn run_reader(options: ReadOptions) -> Result<()> {
@@ -389,7 +219,7 @@ fn run_reader(options: ReadOptions) -> Result<()> {
 
     // spawn this thread to handle receiving messages to performing blocking network and db IO
     let io_thread = thread::spawn(move || -> Result<()> {
-        io_loop(cloned_app, io_tx_clone, io_rx, &options_clone)
+        io::io_loop(cloned_app, io_tx_clone, io_rx, &options_clone)
     });
 
     // this is basically "the Elm Architecture".
