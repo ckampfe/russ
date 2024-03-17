@@ -1,3 +1,6 @@
+//! The functions and datatypes in this module all for the retrieval and storage
+//! of RSS/Atom feeds in Russ' SQLite database.
+
 use crate::modes::ReadMode;
 use anyhow::{bail, Context, Result};
 use atom_syndication as atom;

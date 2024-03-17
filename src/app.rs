@@ -1,3 +1,5 @@
+//! The main application state is managed here, in `App`.
+
 use crate::modes::{Mode, ReadMode, Selected};
 use crate::{util, IoCommand};
 use anyhow::Result;

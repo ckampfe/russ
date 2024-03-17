@@ -1,3 +1,5 @@
+//! miscellaneous functions that feel like they don't fit anywhere else
+
 use ratatui::widgets::ListState;
 
 #[derive(Debug)]

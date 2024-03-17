@@ -1,3 +1,5 @@
+//! How the UI is rendered, with the Ratatui library.
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Span, Text};
