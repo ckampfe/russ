@@ -7,13 +7,64 @@ use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
 use rss::Channel;
 use rusqlite::params;
-use rusqlite::types::ToSqlOutput;
+use rusqlite::types::{FromSql, ToSqlOutput};
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::str::FromStr;
 
-type EntryId = i64;
-pub type FeedId = i64;
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct EntryId(i64);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FeedId(i64);
+
+impl From<i64> for EntryId {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+impl rusqlite::ToSql for EntryId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(self.0.into())
+    }
+}
+
+impl FromSql for EntryId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        Ok(Self(value.as_i64()?))
+    }
+}
+
+impl Display for EntryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<i64> for FeedId {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+impl rusqlite::ToSql for FeedId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(self.0.into())
+    }
+}
+
+impl FromSql for FeedId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        Ok(Self(value.as_i64()?))
+    }
+}
+
+impl Display for FeedId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum FeedKind {
@@ -61,6 +112,10 @@ impl FromStr for FeedKind {
     }
 }
 
+/// Feed metadata.
+/// Entries are stored separately.
+/// The `id` of this type corresponds to `feed_id` on
+/// `Entry` and `EntryMeta`.
 #[derive(Clone, Debug)]
 pub struct Feed {
     pub id: FeedId,
@@ -74,6 +129,8 @@ pub struct Feed {
     pub latest_etag: Option<String>,
 }
 
+/// An entry's metadata and content.
+/// In contrast to `EntryMeta`, which only includes the metadata.
 #[derive(Clone, Debug)]
 pub struct Entry {
     pub id: EntryId,
@@ -92,8 +149,8 @@ pub struct Entry {
 impl From<&atom::Entry> for Entry {
     fn from(entry: &atom::Entry) -> Self {
         Self {
-            id: -1,
-            feed_id: -1,
+            id: (-1).into(),
+            feed_id: (-1).into(),
             title: Some(entry.title().to_string()),
             author: entry.authors().first().map(|author| author.name.to_owned()),
             pub_date: entry.published().map(|date| date.with_timezone(&Utc)),
@@ -110,8 +167,8 @@ impl From<&atom::Entry> for Entry {
 impl From<&rss::Item> for Entry {
     fn from(entry: &rss::Item) -> Self {
         Self {
-            id: -1,
-            feed_id: -1,
+            id: (-1).into(),
+            feed_id: (-1).into(),
             title: entry.title().map(|title| title.to_owned()),
             author: entry.author().map(|author| author.to_owned()),
             pub_date: entry.pub_date().and_then(parse_datetime),
@@ -127,6 +184,12 @@ impl From<&rss::Item> for Entry {
     }
 }
 
+/// Metadata for an entry.
+///
+/// This type exists so we can load entry metadata for lots of
+/// entries, without having to load all of the content for those entries,
+/// as we only ever need an entry's content in memory when we are displaying
+/// the currently selected entry.
 #[derive(Clone, Debug)]
 pub struct EntryMeta {
     pub id: EntryId,
@@ -193,7 +256,7 @@ impl FromStr for FeedAndEntries {
         match atom::Feed::from_str(s) {
             Ok(atom_feed) => {
                 let feed = Feed {
-                    id: 0,
+                    id: 0.into(),
                     title: Some(atom_feed.title.to_string()),
                     feed_link: None,
                     link: atom_feed.links.first().map(|link| link.href().to_string()),
@@ -216,7 +279,7 @@ impl FromStr for FeedAndEntries {
             Err(_e) => match Channel::from_str(s) {
                 Ok(channel) => {
                     let feed = Feed {
-                        id: 0,
+                        id: 0.into(),
                         title: Some(channel.title().to_string()),
                         feed_link: None,
                         link: Some(channel.link().to_string()),
@@ -802,10 +865,10 @@ mod tests {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
         initialize_db(&mut conn).unwrap();
         subscribe_to_feed(&http_client, &mut conn, ZCT).unwrap();
-        let feed_id = 1;
+        let feed_id = 1.into();
         let old_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
         refresh_feed(&http_client, &mut conn, feed_id).unwrap();
-        let e = get_entry_meta(&conn, 1).unwrap();
+        let e = get_entry_meta(&conn, 1.into()).unwrap();
         e.mark_as_read(&conn).unwrap();
         let new_entries = get_entries_metas(&conn, &ReadMode::ShowUnread, feed_id).unwrap();
 
