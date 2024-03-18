@@ -52,6 +52,7 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 - `a` - toggle between read/unread entries
 - `c` - copy the selected link to the clipboard (feed or entry)
 - `o` - open the selected link in your browser (feed or entry)
+- `s` - scrape the source of the selected entry for additional text
 - `ctrl-u`/`ctrl-d` - scroll up/down a page at a time
 
 ### controls - insert mode
