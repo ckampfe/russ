@@ -5,7 +5,7 @@
 pub enum Selected {
     Feeds,
     Entries,
-    Entry(crate::rss::EntryMeta),
+    Entry(crate::rss::EntryMetadata),
     None,
 }
 

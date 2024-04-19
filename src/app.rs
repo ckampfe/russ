@@ -175,8 +175,8 @@ pub struct AppImpl {
     pub current_feed: Option<crate::rss::Feed>,
     pub feeds: util::StatefulList<crate::rss::Feed>,
     // entry stuff
-    pub current_entry_meta: Option<crate::rss::EntryMeta>,
-    pub entries: util::StatefulList<crate::rss::EntryMeta>,
+    pub current_entry_meta: Option<crate::rss::EntryMetadata>,
+    pub entries: util::StatefulList<crate::rss::EntryMetadata>,
     pub entry_selection_position: usize,
     pub current_entry_text: String,
     pub entry_scroll_position: u16,
@@ -212,7 +212,7 @@ impl AppImpl {
 
         crate::rss::initialize_db(&mut conn)?;
         let feeds: util::StatefulList<crate::rss::Feed> = vec![].into();
-        let entries: util::StatefulList<crate::rss::EntryMeta> = vec![].into();
+        let entries: util::StatefulList<crate::rss::EntryMetadata> = vec![].into();
         // default to having nothing selected,
         // as it's possible we are starting for the first time,
         // with an empty feeds db
@@ -363,7 +363,7 @@ impl AppImpl {
         })
     }
 
-    fn get_selected_entry_meta(&self) -> Option<Result<crate::rss::EntryMeta>> {
+    fn get_selected_entry_meta(&self) -> Option<Result<crate::rss::EntryMetadata>> {
         self.entries.state.selected().and_then(|selected_idx| {
             self.entries
                 .items

@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::rss::EntryMeta;
+use crate::rss::EntryMetadata;
 
 const PINK: Color = Color::Rgb(255, 150, 167);
 
@@ -106,7 +106,7 @@ fn draw_first_run_helper(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-fn draw_entry_info(f: &mut Frame, area: Rect, entry_meta: &EntryMeta) {
+fn draw_entry_info(f: &mut Frame, area: Rect, entry_meta: &EntryMetadata) {
     let mut text = String::new();
     if let Some(item) = &entry_meta.title {
         text.push_str("Title: ");
