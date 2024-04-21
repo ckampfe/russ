@@ -5,6 +5,7 @@ use crate::modes::ReadMode;
 use anyhow::{bail, Context, Result};
 use atom_syndication as atom;
 use chrono::prelude::{DateTime, Utc};
+use html_escape::decode_html_entities_to_string;
 use rss::Channel;
 use rusqlite::params;
 use rusqlite::types::{FromSql, ToSqlOutput};
@@ -155,11 +156,25 @@ struct IncomingEntry {
 impl From<&atom::Entry> for IncomingEntry {
     fn from(entry: &atom::Entry) -> Self {
         Self {
-            title: Some(entry.title().to_string()),
-            author: entry.authors().first().map(|author| author.name.to_owned()),
+            title: {
+                let mut title = String::new();
+                decode_html_entities_to_string(entry.title(), &mut title);
+                Some(title)
+            },
+            author: entry.authors().first().map(|entry_author| {
+                let mut author = String::new();
+                decode_html_entities_to_string(&entry_author.name, &mut author);
+                author
+            }),
             pub_date: entry.published().map(|date| date.with_timezone(&Utc)),
             description: None,
-            content: entry.content().and_then(|content| content.value.to_owned()),
+            content: entry.content().and_then(|entry_content| {
+                entry_content.value().map(|entry_content| {
+                    let mut content = String::new();
+                    decode_html_entities_to_string(entry_content, &mut content);
+                    content
+                })
+            }),
             link: entry.links().first().map(|link| link.href().to_string()),
         }
     }
@@ -168,13 +183,27 @@ impl From<&atom::Entry> for IncomingEntry {
 impl From<&rss::Item> for IncomingEntry {
     fn from(entry: &rss::Item) -> Self {
         Self {
-            title: entry.title().map(|title| title.to_owned()),
-            author: entry.author().map(|author| author.to_owned()),
+            title: entry.title().map(|entry_title| {
+                let mut title = String::new();
+                decode_html_entities_to_string(entry_title, &mut title);
+                title
+            }),
+            author: entry.author().map(|entry_author| {
+                let mut author = String::new();
+                decode_html_entities_to_string(entry_author, &mut author);
+                author
+            }),
             pub_date: entry.pub_date().and_then(parse_datetime),
-            description: entry
-                .description()
-                .map(|description| description.to_owned()),
-            content: entry.content().map(|content| content.to_owned()),
+            description: entry.description().map(|entry_description| {
+                let mut description = String::new();
+                decode_html_entities_to_string(entry_description, &mut description);
+                description
+            }),
+            content: entry.content().map(|entry_content| {
+                let mut content = String::new();
+                decode_html_entities_to_string(entry_content, &mut content);
+                content
+            }),
             link: entry.link().map(|link| link.to_owned()),
         }
     }
