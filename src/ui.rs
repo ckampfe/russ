@@ -1,3 +1,5 @@
+//! How the UI is rendered, with the Ratatui library.
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Span, Text};
@@ -7,7 +9,7 @@ use std::rc::Rc;
 
 use crate::app::AppImpl;
 use crate::modes::{Mode, ReadMode, Selected};
-use crate::rss::EntryMeta;
+use crate::rss::EntryMetadata;
 
 const PINK: Color = Color::Rgb(255, 150, 167);
 
@@ -104,7 +106,7 @@ fn draw_first_run_helper(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-fn draw_entry_info(f: &mut Frame, area: Rect, entry_meta: &EntryMeta) {
+fn draw_entry_info(f: &mut Frame, area: Rect, entry_meta: &EntryMetadata) {
     let mut text = String::new();
     if let Some(item) = &entry_meta.title {
         text.push_str("Title: ");
@@ -377,18 +379,18 @@ fn draw_entry(f: &mut Frame, area: Rect, app: &mut AppImpl) {
     } else {
         panic!("draw_entry should only be called when app.selected was Selected::Entry")
     };
-    let default_entry_title = "No entry title".to_string();
-    let default_feed_title = "No feed title".to_string();
 
-    let entry_title = entry_meta.title.as_ref().unwrap_or(&default_entry_title);
+    let entry_title = entry_meta.title.as_deref().unwrap_or("No entry title");
 
     let feed_title = app
         .current_feed
         .as_ref()
-        .and_then(|feed| feed.title.as_ref())
-        .unwrap_or(&default_feed_title);
+        .and_then(|feed| feed.title.as_deref())
+        .unwrap_or("No feed title");
 
-    let mut title = entry_title.to_owned();
+    let mut title = String::new();
+    title.reserve_exact(entry_title.len() + feed_title.len() + 3);
+    title.push_str(entry_title);
     title.push_str(" - ");
     title.push_str(feed_title);
 

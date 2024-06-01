@@ -1,3 +1,5 @@
+//! Import OPML feed lists into Russ
+
 use crate::ImportOptions;
 use anyhow::{Context, Result};
 
