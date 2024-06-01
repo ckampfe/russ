@@ -4,7 +4,7 @@ use crate::modes::{Mode, Selected};
 use anyhow::Result;
 use app::App;
 use clap::{Parser, Subcommand};
-use crossterm::event::{self, KeyEvent};
+use crossterm::event::{self, KeyEvent, KeyEventKind};
 use crossterm::event::{Event as CEvent, KeyCode, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -284,65 +284,73 @@ enum Action {
 fn get_action(app: &App, event: Event<KeyEvent>) -> Option<Action> {
     match app.mode() {
         Mode::Normal => match event {
-            Event::Input(keypress) => match (keypress.code, keypress.modifiers) {
-                (KeyCode::Char('q'), _)
-                | (KeyCode::Char('c'), KeyModifiers::CONTROL)
-                | (KeyCode::Esc, _) => {
-                    if !app.error_flash_is_empty() {
-                        Some(Action::ClearErrorFlash)
-                    } else {
-                        Some(Action::Quit)
+            Event::Input(key_event) if key_event.kind == KeyEventKind::Press => {
+                match (key_event.code, key_event.modifiers) {
+                    (KeyCode::Char('q'), _)
+                    | (KeyCode::Char('c'), KeyModifiers::CONTROL)
+                    | (KeyCode::Esc, _) => {
+                        if !app.error_flash_is_empty() {
+                            Some(Action::ClearErrorFlash)
+                        } else {
+                            Some(Action::Quit)
+                        }
                     }
+                    (KeyCode::Char('r'), KeyModifiers::NONE) => match app.selected() {
+                        Selected::Feeds => Some(Action::RefreshFeed),
+                        _ => Some(Action::ToggleReadStatus),
+                    },
+                    (KeyCode::Char('x'), KeyModifiers::NONE) => Some(Action::RefreshAll),
+                    (KeyCode::Left, _) | (KeyCode::Char('h'), _) => Some(Action::MoveLeft),
+                    (KeyCode::Right, _) | (KeyCode::Char('l'), _) => Some(Action::MoveRight),
+                    (KeyCode::Down, _) | (KeyCode::Char('j'), _) => Some(Action::MoveDown),
+                    (KeyCode::Up, _) | (KeyCode::Char('k'), _) => Some(Action::MoveUp),
+                    (KeyCode::PageUp, _) | (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                        Some(Action::PageUp)
+                    }
+                    (KeyCode::PageDown, _) | (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
+                        Some(Action::PageDown)
+                    }
+                    (KeyCode::Enter, _) => match app.selected() {
+                        Selected::Entries | Selected::Entry(_) => {
+                            if app.has_entries() && app.has_current_entry() {
+                                Some(Action::SelectAndShowCurrentEntry)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    },
+                    (KeyCode::Char('?'), _) => Some(Action::ToggleHelp),
+                    (KeyCode::Char('a'), _) => Some(Action::ToggleReadMode),
+                    (KeyCode::Char('e'), _) | (KeyCode::Char('i'), _) => {
+                        Some(Action::EnterEditingMode)
+                    }
+                    (KeyCode::Char('c'), _) => Some(Action::CopyLinkToClipboard),
+                    (KeyCode::Char('o'), _) => Some(Action::OpenLinkInBrowser),
+                    _ => None,
                 }
-                (KeyCode::Char('r'), KeyModifiers::NONE) => match app.selected() {
-                    Selected::Feeds => Some(Action::RefreshFeed),
-                    _ => Some(Action::ToggleReadStatus),
-                },
-                (KeyCode::Char('x'), KeyModifiers::NONE) => Some(Action::RefreshAll),
-                (KeyCode::Left, _) | (KeyCode::Char('h'), _) => Some(Action::MoveLeft),
-                (KeyCode::Right, _) | (KeyCode::Char('l'), _) => Some(Action::MoveRight),
-                (KeyCode::Down, _) | (KeyCode::Char('j'), _) => Some(Action::MoveDown),
-                (KeyCode::Up, _) | (KeyCode::Char('k'), _) => Some(Action::MoveUp),
-                (KeyCode::PageUp, _) | (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
-                    Some(Action::PageUp)
-                }
-                (KeyCode::PageDown, _) | (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
-                    Some(Action::PageDown)
-                }
-                (KeyCode::Enter, _) => match app.selected() {
-                    Selected::Entries | Selected::Entry(_) => {
-                        if app.has_entries() && app.has_current_entry() {
-                            Some(Action::SelectAndShowCurrentEntry)
+            }
+            Event::Input(_) => None,
+            Event::Tick => Some(Action::Tick),
+        },
+        Mode::Editing => match event {
+            Event::Input(key_event) if key_event.kind == KeyEventKind::Press => {
+                match key_event.code {
+                    KeyCode::Enter => {
+                        if !app.feed_subscription_input_is_empty() {
+                            Some(Action::SubscribeToFeed)
                         } else {
                             None
                         }
                     }
+                    KeyCode::Char(c) => Some(Action::PushInputChar(c)),
+                    KeyCode::Backspace => Some(Action::DeleteInputChar),
+                    KeyCode::Delete => Some(Action::DeleteFeed),
+                    KeyCode::Esc => Some(Action::EnterNormalMode),
                     _ => None,
-                },
-                (KeyCode::Char('?'), _) => Some(Action::ToggleHelp),
-                (KeyCode::Char('a'), _) => Some(Action::ToggleReadMode),
-                (KeyCode::Char('e'), _) | (KeyCode::Char('i'), _) => Some(Action::EnterEditingMode),
-                (KeyCode::Char('c'), _) => Some(Action::CopyLinkToClipboard),
-                (KeyCode::Char('o'), _) => Some(Action::OpenLinkInBrowser),
-                _ => None,
-            },
-            Event::Tick => Some(Action::Tick),
-        },
-        Mode::Editing => match event {
-            Event::Input(keypress) => match keypress.code {
-                KeyCode::Enter => {
-                    if !app.feed_subscription_input_is_empty() {
-                        Some(Action::SubscribeToFeed)
-                    } else {
-                        None
-                    }
                 }
-                KeyCode::Char(c) => Some(Action::PushInputChar(c)),
-                KeyCode::Backspace => Some(Action::DeleteInputChar),
-                KeyCode::Delete => Some(Action::DeleteFeed),
-                KeyCode::Esc => Some(Action::EnterNormalMode),
-                _ => None,
-            },
+            }
+            Event::Input(_) => None,
             Event::Tick => Some(Action::Tick),
         },
     }
