@@ -7,6 +7,7 @@ A great way to contribute is to improve the README or documentation!
 
 - Add the import of OPML files (https://github.com/ckampfe/russ/pull/32)
 - Implement `ctrl-d` and `ctrl-u` for page scrolling, thank you @Jaco-Minnaar (https://github.com/ckampfe/russ/pull/31)
+- Fix double key input bug on Windows, thank you @sobharrison (https://github.com/ckampfe/russ/issues/22)
 - Big internal rearchitecture to make event handling easier to understand and adapt
 - Clean up entry insertion code, gets rid of some nasty query string building.
 - Bump `ratatui` to `0.26` and fix a few resulting breakages
