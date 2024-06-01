@@ -27,7 +27,7 @@ rss = { version = "2.0", default-features = false }
 rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
 ratatui = "0.26"
 ureq = "2.9"
-webbrowser = "0.8"
+webbrowser = "1"
 wsl = "0.1"
 
 [profile.release]
