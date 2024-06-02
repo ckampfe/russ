@@ -157,7 +157,17 @@ fn draw_feeds(f: &mut Frame, area: Rect, app: &mut AppImpl) {
         .feeds
         .items
         .iter()
-        .flat_map(|feed| feed.title.as_ref())
+        .flat_map(|feed| {
+            let unread_count = crate::rss::get_entries_metas(&app.conn, &app.read_mode, feed.id)
+                .map(|e| e.iter().filter(|entry| entry.read_at.is_none()).count())
+                .unwrap_or(0);
+
+            if unread_count > 0 {
+                Some(format!("{} ({})", feed.title.as_ref()?, unread_count))
+            } else {
+                Some(feed.title.as_ref()?.to_string())
+            }
+        })
         .map(Span::raw)
         .map(ListItem::new)
         .collect::<Vec<ListItem>>();
