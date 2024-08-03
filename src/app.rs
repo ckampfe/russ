@@ -208,6 +208,7 @@ impl AppImpl {
 
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(options.network_timeout)
+            .user_agent("russ/0.5.0")
             .build();
 
         crate::rss::initialize_db(&mut conn)?;
