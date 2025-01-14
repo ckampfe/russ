@@ -208,3 +208,4 @@ I welcome contributions to Russ. If you have an idea for something you would lik
 ## license
 
 See the [license.](LICENSE)
+SPDX-License-Identifier: AGPL-3.0-or-later
