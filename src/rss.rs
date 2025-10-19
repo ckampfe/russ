@@ -140,6 +140,7 @@ struct IncomingFeed {
     link: Option<String>,
     feed_kind: FeedKind,
     latest_etag: Option<String>,
+    last_modified: Option<String>,
 }
 
 /// This exists:
@@ -275,6 +276,10 @@ impl FeedAndEntries {
     fn set_latest_etag(&mut self, etag: Option<String>) {
         self.feed.latest_etag = etag;
     }
+
+    fn set_last_modified(&mut self, last_modified: Option<String>) {
+        self.feed.last_modified = last_modified;
+    }
 }
 
 impl FromStr for FeedAndEntries {
@@ -289,6 +294,7 @@ impl FromStr for FeedAndEntries {
                     link: atom_feed.links.first().map(|link| link.href().to_string()),
                     feed_kind: FeedKind::Atom,
                     latest_etag: None,
+                    last_modified: None,
                 };
 
                 let entries = atom_feed
@@ -308,6 +314,7 @@ impl FromStr for FeedAndEntries {
                         link: Some(channel.link().to_string()),
                         feed_kind: FeedKind::Rss,
                         latest_etag: None,
+                        last_modified: None,
                     };
 
                     let entries = channel
@@ -329,7 +336,7 @@ pub fn subscribe_to_feed(
     conn: &mut rusqlite::Connection,
     url: &str,
 ) -> Result<FeedId> {
-    let feed_and_entries = fetch_feed(http_client, url, None)?;
+    let feed_and_entries = fetch_feed(http_client, url, &CacheHeaders::empty())?;
 
     match feed_and_entries {
         FeedResponse::CacheMiss(feed_and_entries) => {
@@ -371,15 +378,16 @@ enum FeedResponse {
 fn fetch_feed(
     http_client: &ureq::Agent,
     url: &str,
-    current_etag: Option<String>,
+    cache_headers: &CacheHeaders,
 ) -> Result<FeedResponse> {
-    let request = http_client.get(url);
+    let mut request = http_client.get(url);
 
-    let request = if let Some(etag) = current_etag {
-        request.set("If-None-Match", &etag)
-    } else {
-        request
-    };
+    if let Some(etag) = &cache_headers.etag {
+        request = request.set("If-None-Match", etag);
+    }
+    if let Some(last_modified) = &cache_headers.last_modified {
+        request = request.set("If-Modified-Since", last_modified);
+    }
 
     let response = request.call()?;
 
@@ -396,12 +404,20 @@ fn fetch_feed(
                 .and_then(|etag_header| response.header(etag_header))
                 .map(|etag| etag.to_owned());
 
+            let last_modified_header_name = header_names
+                .iter()
+                .find(|header_name| header_name.to_lowercase() == "last-modified");
+
+            let last_modified = last_modified_header_name
+                .and_then(|last_modified_header| response.header(last_modified_header))
+                .map(|last_modified| last_modified.to_owned());
+
             let content = response.into_string()?;
 
             let mut feed_and_entries = FeedAndEntries::from_str(&content)?;
 
             feed_and_entries.set_latest_etag(etag);
-
+            feed_and_entries.set_last_modified(last_modified);
             feed_and_entries.set_feed_link(url);
 
             Ok(FeedResponse::CacheMiss(feed_and_entries))
@@ -425,11 +441,11 @@ pub fn refresh_feed(
     let feed_url = get_feed_url(conn, feed_id)
         .with_context(|| format!("Unable to get url for feed id {feed_id} from the database",))?;
 
-    let current_etag = get_feed_latest_etag(conn, feed_id).with_context(|| {
-        format!("Unable to get latest_etag for feed_id {feed_id} from the database")
+    let cache_headers = get_cache_headers(conn, feed_id).with_context(|| {
+        format!("Unable to get cache headers for feed_id {feed_id} from the database")
     })?;
 
-    let remote_feed = fetch_feed(client, &feed_url, current_etag)
+    let remote_feed = fetch_feed(client, &feed_url, &cache_headers)
         .with_context(|| format!("Failed to fetch feed {feed_url}"))?;
 
     if let FeedResponse::CacheMiss(remote_feed) = remote_feed {
@@ -461,7 +477,14 @@ pub fn refresh_feed(
         in_transaction(conn, |tx| {
             add_entries_to_feed(tx, feed_id, &items_to_add)?;
             update_feed_refreshed_at(tx, feed_id)?;
-            update_feed_etag(tx, feed_id, remote_feed.feed.latest_etag.clone())?;
+            update_cache_headers(
+                tx,
+                feed_id,
+                &CacheHeaders {
+                    etag: remote_feed.feed.latest_etag.clone(),
+                    last_modified: remote_feed.feed.last_modified.clone(),
+                },
+            )?;
             Ok(())
         })?;
     } else {
@@ -529,6 +552,12 @@ pub fn initialize_db(conn: &mut rusqlite::Connection) -> Result<()> {
                 "CREATE UNIQUE INDEX IF NOT EXISTS feeds_feed_link ON feeds (feed_link)",
                 [],
             )?;
+        }
+
+        if schema_version <= 3 {
+            tx.pragma_update(None, "user_version", 4)?;
+
+            tx.execute("ALTER TABLE feeds ADD COLUMN last_modified TEXT", [])?;
         }
 
         Ok(())
@@ -623,14 +652,14 @@ fn update_feed_refreshed_at(tx: &rusqlite::Transaction, feed_id: FeedId) -> Resu
     Ok(())
 }
 
-fn update_feed_etag(
+fn update_cache_headers(
     tx: &rusqlite::Transaction,
     feed_id: FeedId,
-    latest_etag: Option<String>,
+    header: &CacheHeaders,
 ) -> Result<()> {
     tx.execute(
-        "UPDATE feeds SET latest_etag = ?2 WHERE id = ?1",
-        params![feed_id, latest_etag],
+        "UPDATE feeds SET latest_etag = ?2, last_modified = ?3 WHERE id = ?1",
+        params![feed_id, header.etag, header.last_modified],
     )?;
 
     Ok(())
@@ -646,13 +675,29 @@ pub fn get_feed_url(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Stri
     Ok(s)
 }
 
-fn get_feed_latest_etag(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<Option<String>> {
-    let s: Option<String> = conn.query_row(
-        "SELECT latest_etag FROM feeds WHERE id=?1",
+struct CacheHeaders {
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
+impl CacheHeaders {
+    fn empty() -> Self {
+        Self {
+            etag: None,
+            last_modified: None,
+        }
+    }
+}
+
+fn get_cache_headers(conn: &rusqlite::Connection, feed_id: FeedId) -> Result<CacheHeaders> {
+    let s: CacheHeaders = conn.query_row(
+        "SELECT latest_etag, last_modified FROM feeds WHERE id=?1",
         [feed_id],
         |row| {
-            let etag: Option<String> = row.get(0)?;
-            Ok(etag)
+            Ok(CacheHeaders {
+                etag: row.get(0)?,
+                last_modified: row.get(1)?,
+            })
         },
     )?;
 
@@ -856,7 +901,7 @@ mod tests {
         let http_client = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(5))
             .build();
-        let feed_and_entries = fetch_feed(&http_client, ZCT, None).unwrap();
+        let feed_and_entries = fetch_feed(&http_client, ZCT, &CacheHeaders::empty()).unwrap();
         if let FeedResponse::CacheMiss(feed_and_entries) = feed_and_entries {
             assert!(!feed_and_entries.entries.is_empty())
         } else {
