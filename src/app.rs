@@ -37,6 +37,7 @@ pub struct App {
 impl App {
     delegate_to_locked_inner![
         (error_flash_is_empty, bool),
+        (error_flash, Vec<String>),
         (feed_ids, Result<Vec<crate::rss::FeedId>>),
         (force_redraw, Result<()>),
         (http_client, ureq::Agent),
@@ -199,6 +200,9 @@ pub struct AppImpl {
 }
 
 impl AppImpl {
+    pub fn error_flash(&self) -> Vec<String> {
+        self.error_flash.iter().map(|e| format!("{e:?}")).collect()
+    }
     pub fn new(
         options: crate::ReadOptions,
         event_tx: std::sync::mpsc::Sender<crate::Event<crossterm::event::KeyEvent>>,

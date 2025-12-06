@@ -71,6 +71,7 @@ Usage: russ <COMMAND>
 Commands:
   read    Read your feeds
   import  Import feeds from an OPML document
+  sync    Sync all feeds and exit
   help    Print this message or the help of the given subcommand(s)
 
 Options:
@@ -97,6 +98,42 @@ Options:
           RSS/Atom network request timeout in seconds [default: 5]
   -h, --help
           Print help
+
+## sync mode
+
+Run a full refresh of all feeds and exit without launching the TUI. Useful for cron jobs or scripting.
+
+```console
+$ russ sync -h
+Sync all feeds and exit
+
+Usage: russ sync [OPTIONS]
+
+Options:
+  -d, --database-path <DATABASE_PATH>
+          Override where `russ` stores and reads feeds. By default, the feeds database on Linux this will be at `XDG_DATA_HOME/russ/feeds.db` or `$HOME/.local/share/russ/feeds.db`. On MacOS it will be at `$HOME/Library/Application Support/russ/feeds.db`. On Windows it will be at `{FOLDERID_LocalAppData}/russ/data/feeds.db`
+  -n, --network-timeout <NETWORK_TIMEOUT>
+          RSS/Atom network request timeout in seconds [default: 5]
+  -h, --help
+          Print help
+```
+
+Examples:
+
+```console
+# Refresh using the default database and default timeout
+$ russ sync
+
+# Refresh with a custom database path
+$ russ sync -d /path/to/feeds.db
+
+# Increase network timeout to 15 seconds
+$ russ sync -n 15
+
+# Cron (runs hourly)
+$ crontab -e
+0 * * * * /usr/local/bin/russ sync -d /home/you/.local/share/russ/feeds.db >> /home/you/russ-sync.log 2>&1
+```
 ```
 
 ## import OPML mode

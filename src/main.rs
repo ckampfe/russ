@@ -33,6 +33,7 @@ fn main() -> Result<()> {
     match validated_options {
         ValidatedOptions::Import(options) => crate::opml::import(options),
         ValidatedOptions::Read(options) => run_reader(options),
+        ValidatedOptions::Sync(options) => run_sync(options),
     }
 }
 
@@ -80,6 +81,15 @@ enum Command {
         #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
         network_timeout: time::Duration,
     },
+    /// Sync all feeds and exit (no TUI)
+    Sync {
+        /// Override where `russ` stores and reads feeds.
+        #[arg(short, long)]
+        database_path: Option<PathBuf>,
+        /// RSS/Atom network request timeout in seconds
+        #[arg(short, long, default_value = "5", value_parser = parse_seconds)]
+        network_timeout: time::Duration,
+    },
 }
 
 impl Command {
@@ -112,6 +122,16 @@ impl Command {
                     network_timeout: *network_timeout,
                 }))
             }
+            Command::Sync {
+                database_path,
+                network_timeout,
+            } => {
+                let database_path = get_database_path(database_path)?;
+                Ok(ValidatedOptions::Sync(SyncOptions {
+                    database_path,
+                    network_timeout: *network_timeout,
+                }))
+            }
         }
     }
 }
@@ -126,6 +146,7 @@ fn parse_seconds(s: &str) -> Result<time::Duration, std::num::ParseIntError> {
 enum ValidatedOptions {
     Read(ReadOptions),
     Import(ImportOptions),
+    Sync(SyncOptions),
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +161,12 @@ struct ReadOptions {
 struct ImportOptions {
     database_path: PathBuf,
     opml_path: PathBuf,
+    network_timeout: time::Duration,
+}
+
+#[derive(Debug)]
+struct SyncOptions {
+    database_path: PathBuf,
     network_timeout: time::Duration,
 }
 
@@ -251,6 +278,50 @@ fn run_reader(options: ReadOptions) -> Result<()> {
     io_thread
         .join()
         .expect("Unable to join IO thread to main thread")?;
+
+    Ok(())
+}
+
+fn run_sync(options: SyncOptions) -> Result<()> {
+    // Reuse the IO architecture without starting the TUI.
+    let (event_tx, _event_rx) = mpsc::channel();
+    let (io_tx, io_rx) = mpsc::channel();
+
+    // Build ReadOptions with defaults needed by App::new
+    let read_opts = ReadOptions {
+        database_path: options.database_path,
+        tick_rate: 250,
+        flash_display_duration_seconds: time::Duration::from_secs(4),
+        network_timeout: options.network_timeout,
+    };
+
+    let app = App::new(read_opts.clone(), event_tx.clone(), io_tx.clone())?;
+    let cloned_app = app.clone();
+
+    // Spawn IO thread
+    let io_thread = thread::spawn(move || -> Result<()> {
+        io::io_loop(cloned_app, io_tx, io_rx, &read_opts)
+    });
+
+    // Trigger refresh all feeds
+    app.refresh_feeds()?;
+
+    // Allow IO to process request(s) before breaking.
+    // Wait approximately the network timeout, then signal break.
+    thread::sleep(options.network_timeout + time::Duration::from_millis(200));
+    app.break_io_thread()?;
+
+    // Wait for IO thread to finish
+    io_thread
+        .join()
+        .expect("Unable to join IO thread to main thread")?;
+
+    // Print any errors collected during sync to stderr
+    if !app.error_flash_is_empty() {
+        for e in app.error_flash() {
+            eprintln!("{e}");
+        }
+    }
 
     Ok(())
 }
