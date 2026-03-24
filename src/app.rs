@@ -4,7 +4,7 @@ use crate::modes::{Mode, ReadMode, Selected};
 use crate::util;
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::sync::{Arc, Mutex};
 
 macro_rules! delegate_to_locked_inner {
@@ -56,6 +56,8 @@ impl App {
         (on_left, Result<()>),
         (on_right, Result<()>),
         (on_up, Result<()>),
+        (on_top, Result<()>),
+        (on_bottom, Result<()>),
         (page_up, ()),
         (page_down, ()),
         (pop_feed_subscription_input, ()),
@@ -595,7 +597,9 @@ impl AppImpl {
 
             #[cfg(not(target_os = "linux"))]
             {
-                unreachable!("This should never happen. This code should only be reachable if the target OS is WSL.")
+                unreachable!(
+                    "This should never happen. This code should only be reachable if the target OS is WSL."
+                )
             }
         } else if let Some(current_link) = current_link {
             let mut ctx = ClipboardContext::new().map_err(|e| anyhow::anyhow!(e))?;
@@ -695,6 +699,53 @@ impl AppImpl {
                 if let Some(n) = self.entry_scroll_position.checked_add(1) {
                     self.entry_scroll_position = n
                 };
+            }
+            Selected::None => (),
+        }
+
+        Ok(())
+    }
+
+    pub fn on_top(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => {
+                self.feeds.first();
+                self.update_current_feed_and_entries()?;
+            }
+            Selected::Entries => {
+                if !self.entries.items.is_empty() {
+                    self.entries.first();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::Entry(_) => {
+                self.entry_scroll_position = 0;
+            }
+            Selected::None => (),
+        }
+
+        Ok(())
+    }
+
+    pub fn on_bottom(&mut self) -> Result<()> {
+        match self.selected {
+            Selected::Feeds => {
+                self.feeds.last();
+                self.update_current_feed_and_entries()?;
+            }
+            Selected::Entries => {
+                if !self.entries.items.is_empty() {
+                    self.entries.last();
+                    self.entry_selection_position = self.entries.state.selected().unwrap();
+                    self.update_current_entry_meta()?;
+                }
+            }
+            Selected::Entry(_) => {
+                self.entry_scroll_position = self
+                    .entry_lines_len
+                    .saturating_sub(self.entry_lines_rendered_len.into())
+                    .saturating_sub(1) as u16;
             }
             Selected::None => (),
         }

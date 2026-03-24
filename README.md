@@ -44,6 +44,8 @@ Some normal mode controls vary based on whether you are currently selecting a fe
 
 - `q`/`Esc` - quit Russ
 - `hjkl`/arrows - move up/down/left/right between feeds and entries, scroll up/down on an entry
+- `g`/`G` - move to top/bottom of the current entry or list
+- `ctrl-o` - return to previous place after jumping with `g`/`G`
 - `Enter` - read selected entry
 - `r` - refresh the selected feed
 - `r` - mark the selected entry as read

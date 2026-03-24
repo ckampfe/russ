@@ -403,7 +403,6 @@ fn draw_entry(f: &mut Frame, area: Rect, app: &mut AppImpl) {
 
     let paragraph = Paragraph::new(app.current_entry_text.as_str())
         .block(block)
-        .wrap(Wrap { trim: false })
         .scroll((scroll, 0));
 
     let entry_chunk_height = area.height - 2;

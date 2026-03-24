@@ -44,6 +44,14 @@ impl<T> StatefulList<T> {
         self.state.select(Some(i));
     }
 
+    pub fn first(&mut self) {
+        self.state.select(Some(0));
+    }
+
+    pub fn last(&mut self) {
+        self.state.select(Some(self.items.len() - 1));
+    }
+
     pub fn reset(&mut self) {
         self.state.select(Some(0));
     }
